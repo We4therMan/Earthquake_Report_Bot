@@ -30,8 +30,8 @@ class ReportMaker:
     lims = [-127.376, -112.412, 31.166, 42.656]
     default_query = {
         "format": "geojson",
-        "starttime": '2026-01-01',
-        "minmagnitude": '3.5',
+        "starttime": '2015-01-01',
+        "minmagnitude": '3.0',
         "minlongitude": lims[0],
         "maxlongitude": lims[1],
         "minlatitude": lims[2],
@@ -42,8 +42,8 @@ class ReportMaker:
         """
         Loads in county map data and fetches USGS info.
 
-        county_file: path to shapefile with county data (provided in GitHub) (str)
-        query: dict containing USGS earthquakes API query attributes (dict)
+        county_file: path to shapefile with county data (provided in GitHub) [str]
+        query: dict containing USGS earthquakes API query attributes [dict]
 
         County data can possibly be something other than .shp if geopandas
         can parse it, but I would not experiment with it.
@@ -57,8 +57,35 @@ class ReportMaker:
             self.ca_nv = gdf[(gdf["STATEFP"] == "06") | (gdf["STATEFP"] == "32")]
             self.ca_nv = self.ca_nv.to_crs(epsg=4326)
         except:
+            self.ca_nv = None
             print("Could not read county data. Please check your path or file format (recommend .shp)")
             return
+        
+        # initialize all attributes (avoid errors for not existing)
+        self.evlist = None
+        self.ev_id = None
+        self.ev_lastupdate = None
+        self.ev_url = None
+        self.ev_timestamp = None
+        self.ev_detail = None
+        self.has_eew = False
+        self.alert_poly = None
+        self.eew_epix = None
+        self.eew_epiy = None
+        self.alert_colors = None
+        self.regions_used = None
+        self.formatted_warned_areas = None
+        self.mmi_report_caption = ""
+        self.city_names = None
+        self.mmi_coord_pairs = None
+        self.mmis = None
+        self.mmi_plottable = None
+        self.dyfi_used = None
+        self.ev_mag = None
+        self.ev_epix = None
+        self.ev_epiy = None
+        self.ev_maxnumeral = None
+        self.ev_maxdesc = None
 
         # fetch USGS data
         url = 'https://earthquake.usgs.gov/fdsnws/event/1/query'
@@ -67,16 +94,17 @@ class ReportMaker:
         if r.status_code == 200:
             self.data = r.json()
         else:
+            self.data = None
             print("Error fetching USGS API. Please try again.")
             return
         print('Fetched USGS data for query.')
 
         self.evlist = [(i,feat['properties']['title']) for i, feat in enumerate(self.data['features'])]
 
-    def load_ev_detail(self,index=0):
+    def load_ev_detail(self,index=0,is_temp=False):
         """Parses USGS API response and writes txt file with event id
 
-        index: select different item from list (attr evlist). Default 0 (latest event) (int)
+        index: select different item from list (attr evlist). Default 0 (latest event) [int]
 
         """
         event = self.data['features'][index]
@@ -85,7 +113,8 @@ class ReportMaker:
         self.ev_id = event['id']
         self.ev_lastupdate = event['properties']['updated']
         self.ev_url = event['properties']['url']
-        with open("latest_report.txt","w") as f:
+        fname = "temp_report.txt" if is_temp else "latest_report.txt"
+        with open(fname,"w") as f:
             f.write(f"{self.ev_id}\n{self.ev_lastupdate}")
 
         ev_time = event['properties']['time']
@@ -181,7 +210,10 @@ class ReportMaker:
     }
 
     def mmi_style(self,mmi,to_shindo=False):
-        """Manages shaking-related language depending on the measured intensity of the earthquake."""
+        """Manages shaking-related language depending on the measured intensity of the earthquake.
+        mmi: [int]
+        to_shindo: Change style to JMA shindo intensity style [bool]
+        """
         if mmi == 0: mmi = 1
         if mmi > 10: mmi = 10
                                                                         #orange and darkorange look too similar
@@ -290,7 +322,7 @@ class ReportMaker:
                 warned_areas = list(warned_names)
                 condensed_counties = set()
 
-                # Tally which self.regions are warned
+                # Tally which regions are warned
                 regions_tally = []
                 for county in warned_names:
                     for r in self.regions:
@@ -322,7 +354,11 @@ class ReportMaker:
             else: 
                 self.formatted_warned_areas = warned_names
 
-    def make_eew_map(self,show=False):
+    def make_eew_map(self,show=False,is_temp=False):
+        """
+        show: show plot in matplotlib (for testing) [bool, default: False]
+        is_temp: adds "temp" to filename for maps called by command and not by API watcher [bool, default: False]
+        """
         self.get_eew_data()
         self.format_warned_area()          
         if self.has_eew:
@@ -367,8 +403,10 @@ class ReportMaker:
             # plot_polygon(alert_poly)
 
             # axi.set_title(f"Example: {event['properties']['title']}, threshold {MMI}")
-            plt.savefig("latest_eew.png",bbox_inches='tight')
+            fname = "eew_temp.png" if is_temp else "latest_eew.png"
+            plt.savefig(fname,bbox_inches='tight')
             if show: plt.show()
+            else: plt.close()
         else:
             print("No EEW was issued for this event.")
 
@@ -405,38 +443,44 @@ class ReportMaker:
 
         except KeyError:
             print("No losspager. Using dyfi txt")
-            dyfi_data = self.ev_detail['properties']['products']['dyfi'][0]
+            try:
+                dyfi_data = self.ev_detail['properties']['products']['dyfi'][0]
 
-            source_data = dyfi_data['properties']
-            self.ev_mag = float(source_data['magnitude'])
-            self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
+                source_data = dyfi_data['properties']
+                self.ev_mag = float(source_data['magnitude'])
+                self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
 
-            r4 = requests.get(dyfi_data['contents']['cdi_zip.txt']['url'])
-            txt_zip_mmis = r4.text
-            zip_mmis = pd.read_csv(io.StringIO(txt_zip_mmis))
+                r4 = requests.get(dyfi_data['contents']['cdi_zip.txt']['url'])
+                txt_zip_mmis = r4.text
+                zip_mmis = pd.read_csv(io.StringIO(txt_zip_mmis))
 
-            names = []
-            coord_pairs = []
-            mmis = []
+                names = []
+                coord_pairs = []
+                mmis = []
 
-            names = zip_mmis['City'].tolist()
-            mmis = zip_mmis['CDI'].tolist()
-            mmis = [int(round(x)) for x in mmis]
-            for i, row in zip_mmis.iterrows():
-                coord_pairs.append((row['Longitude'], row['Latitude']))
+                names = zip_mmis['City'].tolist()
+                mmis = zip_mmis['CDI'].tolist()
+                mmis = [int(round(x)) for x in mmis]
+                for i, row in zip_mmis.iterrows():
+                    coord_pairs.append((row['Longitude'], row['Latitude']))
 
-            self.city_names = names
-            self.mmi_coord_pairs = coord_pairs
-            self.mmis = mmis
+                self.city_names = names
+                self.mmi_coord_pairs = coord_pairs
+                self.mmis = mmis
 
-            self.dyfi_used = True
+                self.dyfi_used = True
 
-            if names: self.mmi_plottable = True
-        except:
-            print("losspager and dyfi not available. Plot cannot be be made")
-            self.mmi_plottable = False
+                if names: self.mmi_plottable = True
+            except:
+                self.ev_mag = self.ev_detail['properties']['mag']
+                print("losspager and dyfi not available. Plot cannot be be made")
+                self.mmi_plottable = False
 
-    def make_mmi_map(self,show=False):
+    def make_mmi_map(self,show=False,is_temp=False):
+        """
+        show: show plot in matplotlib (for testing) [bool, default: False]
+        is_temp: adds "temp" to filename for maps called by command and not by API watcher [bool, default: False]
+        """
         self.get_mmi_data()
         if self.mmi_plottable:
             box_hl = self.ev_mag/2 #box length depends on magnitude, unit: degrees
@@ -543,8 +587,10 @@ class ReportMaker:
             axi.scatter(epix,epiy,marker='X',c='r',ec='white',linewidths=2,s=750)
 
             # axi.set_title(f"Example: {event['properties']['title']}")
-            plt.savefig("latest_mmis.png",bbox_inches='tight')
+            fname = "mmi_temp.png" if is_temp else "latest_mmis.png"
+            plt.savefig(fname,bbox_inches='tight')
             if show: plt.show()
+            else: plt.close()
 
     def email_mmi_report(self):
         # approve = input("This will send an email. Type 'y' to approve:")
