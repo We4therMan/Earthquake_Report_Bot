@@ -2,9 +2,13 @@ import discord
 from discord.ext import tasks
 from discord import app_commands
 from discord.ext import commands
+from io import StringIO
+from pathlib import Path
 from config import TOKEN
-from USGSreportmaker import ReportMaker
+from USGSreportmaker import ReportMaker, format_usgs_time
 from manage_guilds import init_guild_table, set_channel, get_channel
+from manage_reports import init_reports_table, store_report_msg, select_report_msgs
+from embeds import EventListView
 from datetime import datetime, UTC
 from zoneinfo import ZoneInfo
 
@@ -14,7 +18,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     # await bot.tree.sync()
-    init_guild_table()
     print([guild.id for guild in bot.guilds])
     print([get_channel(guild.id) for guild in bot.guilds])
     print(f"Bot connected. Logged in as {bot.user}")
@@ -31,9 +34,10 @@ async def on_ready():
             except discord.NotFound:
                 continue
         try:
-            await channel.send(f"_Good morning everyone. I have just been activated and the time is {datetime.now()}_")
+            # await channel.send(f"_Good morning everyone. I have just been activated and the time is {datetime.now().strftime("%b %d, %Y %I:%M %p")}_")
+            await channel.send("minasan, konbanwa ^w^")
         except discord.Forbidden:
-            print("No permission to write here. Removing to avoid errors.")
+            print(f"No permission to write in {guild.name}. Removing to avoid errors. Use /setchannel to reset.")
             set_channel(guild.id, 0)
     check_quakes.start()
 
@@ -59,16 +63,26 @@ async def setchannel(
 # @bot.tree.command(name="query",description="Request a new USGS query ")
 
 @bot.tree.command(name="eventlist",description="Show full saved event list.")
-async def showevlist(ctx):
-    ctx.send(f'`{"\n".join([event for event in rm.evlist])}`')
+async def eventlist(interaction: discord.Interaction):
+    text = "\n".join(f"{i}: {ev}" for i, ev in rm.evlist)
+    file = discord.File(
+        StringIO(text),
+        filename="eventlist.txt"
+    )
+    await interaction.response.send_message(
+        f"Latest 100 visible. Download file to see all {len(rm.evlist)}",
+        file=file,
+        ephemeral=True
+        )
 
 @bot.tree.command(name="viewevent",description="Show the report for an event in the eventlist.")
 @app_commands.describe(index="Index of the eventlist earthquake you want to view (latest is 0, default)")
-async def select_list_event(ctx, index: int):
-    if not isinstance(index, int):
-        ctx.send("Not a valid input. Must be a number.")
-        return
-    ctx.send(f"Loading event {rm.evlist[index]}")
+async def viewevent(interaction: discord.Interaction, index: int):
+    try:
+        await interaction.response.defer()
+        status = await interaction.followup.send(f"Loading event {':\n'.join(rm.evlist[index])}...")
+    except IndexError:
+        await interaction.followup.send(f"Index out of bounds. Must be 0 to {len(rm.evlist)-1}")
 
     rm_temp = ReportMaker() # new insance to avoid editing the auto-reports
 
@@ -81,40 +95,44 @@ async def select_list_event(ctx, index: int):
     before_SA = datetime.strptime(rm_temp.ev_timestamp,tformat) < datetime.strptime(SAlaunch,tformat)
 
     if rm_temp.has_eew:
+        await status.edit(content="Loading ShakeAlert data.")
         rm_temp.make_eew_map(is_temp=True)
         msg1 = (
             f"This earthquake triggered ShakeAlert.\n"
             f"An alert was sent to the following regions/counties:\n"
-            f"-{"\n-".join(rm_temp.formatted_warned_areas)}\n"
+            f"-{'\n-'.join(rm_temp.formatted_warned_areas)}\n"
         )
-        ctx.send(msg1,file=discord.File("eew_temp.png"))
+        await interaction.followup.send(msg1,file=discord.File("eew_temp.png"))
     elif before_SA:
-        ctx.send("This earthquake occurred before the launch of ShakeAlert.")
+        await interaction.followup.send("This earthquake occurred before the launch of ShakeAlert.")
     else:
-        ctx.send("This earthquake did not trigger ShakeAlert.")
+        await interaction.followup.send("This earthquake did not trigger ShakeAlert.")
 
+    await status.edit(content="Loading intensity data.")
     rm_temp.make_mmi_map(is_temp=True)
 
     if rm_temp.mmi_plottable:
         msg2 = (
             f"On {rm_temp.ev_timestamp}\n"
             f"{rm_temp.mmi_report_caption}\n"
-            f"Magnitude: {rm.ev_mag}\n"
+            f"Magnitude: {rm_temp.ev_mag}\n"
             f"Maximum intensity: {rm_temp.ev_maxnumeral} ({rm_temp.ev_maxdesc})\n"
             f"Maximum intensity felt in the following cities:\n"
-            f"-{"\n-".join(rm_temp.cities_max_mmi)}\n\n"
+            f"-{'\n-'.join(rm_temp.cities_max_mmi)}\n\n"
         )
-        ctx.send(msg2,file=discord.File("eew_temp.png"))
+        await interaction.followup.send(msg2,file=discord.File("mmi_temp.png"))
     else:
         msg2_alt = (
             f"On {rm_temp.ev_timestamp}\n"
-            f"A magnitude {rm.ev_mag} earthquake occurred in the region.\n"
+            f"A magnitude {rm_temp.ev_mag} earthquake occurred in the region.\n"
             f"No intensity-by-city information is available to plot for this earthquake.\n"
             f"For more details visit {rm_temp.ev_url}"
         )
-        ctx.send(msg2_alt)
+        await interaction.followup.send(msg2_alt)
+    await status.edit(content="Done!")
 
-@bot.command
+
+@bot.command()
 @commands.is_owner()
 async def sync(ctx):
     synced = await bot.tree.sync()
@@ -132,6 +150,8 @@ async def testsync(ctx):
     # Syncs directly to that server instantly
     synced = await bot.tree.sync(guild=guild)
     await ctx.send(f"Instantly synced {len(synced)} commands to test server.")
+    synced = await bot.tree.sync()
+    await ctx.send(f"Synced {len(synced)} commands globally.")
 
 @tasks.loop(minutes=1)
 async def check_quakes():
@@ -141,103 +161,102 @@ async def check_quakes():
     # call API
     global rm
     rm = ReportMaker()
+
     # load in latest event from API and write txt info (index for test)
-    index = 0
+    index = 0 # falsy if 0, used in format_report_msg
     rm.load_ev_detail(index=index)
-    # print(rm.evlist)
 
     ev_updated = False
     # if last bot event is same as API last event
     if curr_ev_id == rm.ev_id:
         print("No new event.")
-        # check for update on same event
+        # if no new event, check for update on same event
         if int(curr_ev_lastupdate) == rm.ev_lastupdate:
             # do nothing if no updates
             print("No updates on latest event.")
             return
         else:
-            # remake maps for update
-            # no need for new EEW map, only MMI
+            # if updated, write update message, remake mmi map
+            # no need for new eew map
             print("Latest event updated.")
             ev_updated = True
             rm.make_mmi_map()
-            mmi_header = "The latest earthquake report by the USGS has been updated."
+            msg_update = rm.format_report_msg("update",index)
+
+            # edit all existing reports
+            for sent_report in select_report_msgs(rm.ev_id):
+                guild_id, channel_id, msg_id = sent_report
+                print(f"Fetching msg {msg_id}")
+                # get channel id from bot chache
+                channel = bot.get_channel(channel_id)
+                # find through api if not available
+                if not channel:
+                    try:
+                        channel = await bot.fetch_channel(channel_id)
+                    except discord.NotFound:
+                        print(f"Channel {channel} in guild {guild_id} not found.")
+                        continue
+                    except discord.Forbidden:
+                        print(f"Bot does not have permission to access {channel} in guild {guild_id}.")
+                        continue
+
+                # fetch original report msg
+                if channel:
+                    try:
+                        msg_to_edit = await channel.fetch_message(msg_id)
+                    except:
+                        print(f"Original report message in {channel_id} not found. It may have been deleted.")
+                        continue
+                try:
+                    await msg_to_edit.edit(content=msg_update,attachments=[discord.File("latest_mmis.png")])
+                    print(f'msg sent')
+                except discord.Forbidden:
+                    print(f"No permissions to send message in {channel_id}")
+                    continue
+            # exit function after loop is done
+            return
     else:
-        # new event
-        # make both maps
+        # it's a new event 
+        # (note: can also be the previous event if the latest event has a magnitude downgrade)
+        # make both maps and messages
         print("New event posted.")
         rm.make_eew_map()
         rm.make_mmi_map()
-        eew_header = "A new ShakeAlert product has been published by the USGS."
-        mmi_header = "A new earthquake report has been published by the USGS."
-    
-    if index != 0:
-        eew_header = eew_header + "\n\n**THIS IS A TEST**"
-        mmi_header = mmi_header + "\n\n**THIS IS A TEST**"
+        msg_eew = rm.format_report_msg("eew",index)
+        msg_mmi = rm.format_report_msg("mmi",index)
 
-    print("Bot pushing messages")
+    print("Broadcasting messages")
     for guild in bot.guilds:
         channel_id = get_channel(guild.id)
-        if channel_id is None:
-            print(f"No channel set for guild {guild.name}")
+        if not channel_id:
+            print(f"No channel set for guild {guild.name}. Use /setchannel (channel name) to set a channel.")
             continue
 
         channel = bot.get_channel(channel_id)
-
         if channel is None:
             try:
                 channel = await bot.fetch_channel(channel_id)
             except discord.NotFound:
                 continue
+            except discord.Forbidden:
+                continue
 
-        # do this for each valid channel
+        # in each report channel
+        # if event has shakealert product, send alert and map
         if rm.has_eew:
-            alert_message = (f"_{eew_header}_\n\n"
-                    f"A recent earthquake has triggered the ShakeAlert system.\n"
-                    f"An alert was sent to the following regions/counties:\n"
-                    f"- {"\n- ".join(rm.formatted_warned_areas)}\n"
-                    f"If you receive an earthquake alert\n"
-                    f"**drop, cover, and hold on.**"
-                    )
-            await channel.send(alert_message,file=discord.File("latest_eew.png"))
-
-        report_message =  (f"_{mmi_header}_\n\n"
-                # f"_Message generated {datetime.now()}_"
-                f"**{rm.ev_timestamp}**\n"
-                f"**{rm.mmi_report_caption}**\n"
-                f"Magnitude: {rm.ev_mag}\n"
-                f"Maximum intensity: {rm.ev_maxnumeral} ({rm.ev_maxdesc})\n"
-                f"Maximum intensity felt in the following cities:\n"
-                f"- {"\n- ".join(rm.cities_max_mmi)}\n\n"
-                f"If you felt this earthquake, visit {rm.ev_url+"/tellus"}"
-                f" to fill out a Did You Feel It report.\n\n\n"
-            )
+            await channel.send(msg_eew,file=discord.File("latest_eew.png"))
         
         if rm.mmi_plottable:
             mmi_map = discord.File("latest_mmis.png")
-            # if event update edit report message
-            if ev_updated:
-                # update time to datetime
-                update_dt = datetime.fromtimestamp(rm.ev_lastupdate/1000, UTC)
-                # to pacific time
-                update_pt = update_dt.astimezone(ZoneInfo("America/Los_Angeles"))
-                #to time string
-                update_str = update_pt.strftime("%b %d, %Y %I:%M %p")
-                try:
-                    latest_mmi_msg.edit(report_message+f"_This event was last updated on {update_str}_", attachments=[mmi_map])
-                except:
-                    return
-            #if new event send full new report
-            else:  
-                latest_mmi_msg = await channel.send(report_message,file=mmi_map)
+            #if new event, send full new report
+            mmi_msg = await channel.send(msg_mmi,file=mmi_map)
+            store_report_msg(rm.ev_id, mmi_msg.guild.id, mmi_msg.channel.id, mmi_msg.id)
+
+        # if event not mappable
         else:
-            report_message = (f"_{mmi_header}_\n\n"
-                f"On {rm.ev_timestamp}\n"
-                f"A magnitude {rm.ev_mag} earthquake occurred in the region.\n"
-                f"No intensity-by-city information is available to plot for this earthquake.\n"
-                f"For more details visit {rm.ev_url}"
-            )
-            await channel.send(report_message)
+            msg_nomap = rm.format_report_msg("nomap",index)
+            nomap_msg = await channel.send(msg_nomap)
+            store_report_msg(rm.ev_id, nomap_msg.guild.id, nomap_msg.channel.id, nomap_msg.id)
 
 def read_latest():
     try:
@@ -248,5 +267,15 @@ def read_latest():
             return curr_ev_id, curr_ev_lastupdate
     except FileNotFoundError:
         return None
+    
+# on file run, create databases if they don't exist
+if not Path("guild_settings.db").is_file():
+    print("guild_settings.db not found. Creating file. Report channels need to be reset.")
+    init_guild_table()
 
+if not Path("reports.db").is_file():
+    print("reports.db not found. Creating file. Updates will not work on previous events.")
+    init_reports_table()
+
+# run bot
 bot.run(TOKEN)

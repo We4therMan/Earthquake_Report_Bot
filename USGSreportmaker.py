@@ -74,13 +74,14 @@ class ReportMaker:
         self.eew_epiy = None
         self.alert_colors = None
         self.regions_used = None
-        self.formatted_warned_areas = None
+        self.formatted_warned_areas = []
         self.mmi_report_caption = ""
-        self.city_names = None
-        self.mmi_coord_pairs = None
-        self.mmis = None
-        self.mmi_plottable = None
-        self.dyfi_used = None
+        self.city_names = []
+        self.mmi_coord_pairs = []
+        self.mmis = []
+        self.mmi_plottable = False
+        self.cities_max_mmi = []
+        self.dyfi_used = False
         self.ev_mag = None
         self.ev_epix = None
         self.ev_epiy = None
@@ -89,7 +90,7 @@ class ReportMaker:
 
         # fetch USGS data
         url = 'https://earthquake.usgs.gov/fdsnws/event/1/query'
-        r = requests.get(url,params=query)
+        r = requests.get(url,params=query,timeout=15)
 
         if r.status_code == 200:
             self.data = r.json()
@@ -99,7 +100,7 @@ class ReportMaker:
             return
         print('Fetched USGS data for query.')
 
-        self.evlist = [(i,feat['properties']['title']) for i, feat in enumerate(self.data['features'])]
+        self.evlist = [(str(i),feat['properties']['title']) for i, feat in enumerate(self.data['features'])]
 
     def load_ev_detail(self,index=0,is_temp=False):
         """Parses USGS API response and writes txt file with event id
@@ -113,14 +114,17 @@ class ReportMaker:
         self.ev_id = event['id']
         self.ev_lastupdate = event['properties']['updated']
         self.ev_url = event['properties']['url']
+
+        # write txt
         fname = "temp_report.txt" if is_temp else "latest_report.txt"
         with open(fname,"w") as f:
             f.write(f"{self.ev_id}\n{self.ev_lastupdate}")
 
         ev_time = event['properties']['time']
-        ev_utc = datetime.fromtimestamp(ev_time / 1000, UTC)
-        ev_local = ev_utc.astimezone(ZoneInfo("America/Los_Angeles"))
-        time_str = ev_local.strftime("%b %d, %Y %I:%M %p")
+        # ev_utc = datetime.fromtimestamp(ev_time / 1000, UTC)
+        # ev_local = ev_utc.astimezone(ZoneInfo("America/Los_Angeles"))
+        # time_str = ev_local.strftime("%b %d, %Y %I:%M %p")
+        time_str = format_usgs_time(ev_time)
         self.ev_timestamp = time_str
         print("Loading report:")
         print(ev_name)
@@ -218,9 +222,9 @@ class ReportMaker:
         if mmi > 10: mmi = 10
                                                                         #orange and darkorange look too similar
         box_colors = ['white','lightblue','cyan','blue','green','yellow','orange','brown','red','darkred']
-        txt_colors = ['k',    'k',    'k',       'w',   'w',    'k',      'k',     'k',        'w',  'y']
+        txt_colors = ['k',    'k',    'k',       'w',   'w',    'k',      'k',     'w',        'w',  'y']
         weights =    [400,     400,    400,       400,   400,    400,      400,     600,       700,   800]
-        fontsizes =  [10,       10,     10,        10,    10,     10,       10,       7.5,        12,    12]
+        fontsizes =  [10,       10,     10,        10,    10,     10,       10,       8,        12,    12]
         MMI_ticks =  ['I',    'II',   'III',     'IV',  'V',    'VI',     'VII',   'VIII',     'IX',  'X']
         shindo =     ['0',     '1',    '2',       '3',   '4',   '5-',     '5+',    '6-',       '6+',  '7']
         descriptions = [
@@ -592,6 +596,69 @@ class ReportMaker:
             if show: plt.show()
             else: plt.close()
 
+    def format_report_msg(self,report_type,test=False):
+        """Generates the report message for the bot to send.
+
+        report_type: the type of report to output. Options:
+        "eew", "mmi", "update". [str]
+        test: should be True during testing (i.e. index of report is not 0) [bool, default: False]
+
+        returns 'msg' [str]
+
+        In bot.py 'check_quakes()', 'test' can take 'index' [int] as argument since 
+        by design it is falsy when the bot is not being tested.
+        """
+
+        if report_type == "eew":
+            msg = (
+                f"_A new ShakeAlert product has been published by the USGS._\n\n"
+                f"A recent earthquake has triggered the ShakeAlert system.\n"
+                f"An alert was sent to the following regions/counties:\n"
+                f"- {"\n- ".join(self.formatted_warned_areas)}\n"
+                f"If you receive an earthquake alert\n"
+                f"**drop, cover, and hold on.**"
+            )
+        
+        elif report_type == "mmi":
+            msg = (f"_A new earthquake report has been published by the USGS._\n\n"
+                f"**{self.ev_timestamp}**\n"
+                f"**{self.mmi_report_caption}**\n"
+                f"Magnitude: {self.ev_mag}\n"
+                f"Maximum intensity: {self.ev_maxnumeral} ({self.ev_maxdesc})\n"
+                f"Maximum intensity felt in the following cities:\n"
+                f"- {"\n- ".join(self.cities_max_mmi)}\n\n"
+                f"If you felt this earthquake, visit {self.ev_url+"/tellus"}"
+                f" to fill out a Did You Feel It report."
+            )
+
+        elif report_type == "update":
+            msg = (f"_This earthquake report has been updated._\n\n"
+                f"**{self.ev_timestamp}**\n"
+                f"**{self.mmi_report_caption}**\n"
+                f"Magnitude: {self.ev_mag}\n"
+                f"Maximum intensity: {self.ev_maxnumeral} ({self.ev_maxdesc})\n"
+                f"Maximum intensity felt in the following cities:\n"
+                f"- {"\n- ".join(self.cities_max_mmi)}\n"
+                f"If you felt this earthquake, visit {self.ev_url+"/tellus"}"
+                f" to fill out a Did You Feel It report.\n\n"
+                f"_Last updated {format_usgs_time(self.ev_lastupdate)}_"
+            )
+        
+        elif report_type == "nomap":
+            msg = (f"_A new earthquake report has been published by the USGS._\n\n"
+                f"On {self.ev_timestamp}\n"
+                f"A magnitude {self.ev_mag} earthquake occurred in the region.\n"
+                f"No intensity-per-city information is available to plot for this earthquake.\n"
+                f"For more details visit {self.ev_url}"
+            )
+
+        if test:
+            return "**THIS IS A TEST**\n" + msg
+        else:
+            return msg
+
+
+  
     def email_mmi_report(self):
         # approve = input("This will send an email. Type 'y' to approve:")
         approve = 'y'
@@ -639,3 +706,9 @@ class ReportMaker:
                 print(f"An error occurred: {e}")
 
         else: print("Not sending email")
+
+def format_usgs_time(t):
+    dt = datetime.fromtimestamp(t/1000, UTC)
+    pt = dt.astimezone(ZoneInfo("America/Los_Angeles"))
+    timestr = pt.strftime("%b %d, %Y %I:%M %p")
+    return timestr

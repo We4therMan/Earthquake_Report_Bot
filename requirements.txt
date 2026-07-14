@@ -1,3 +1,9 @@
 discord.py
 requests
 python-dotenv
+pandas
+geopandas
+shapely
+matplotlib
+numpy
+cartopy
