@@ -67,7 +67,7 @@ async def eventlist(interaction: discord.Interaction):
     text = "\n".join(f"{i}: {ev}" for i, ev in rm.evlist)
     file = discord.File(
         StringIO(text),
-        filename="eventlist.txt"
+        filename="data/eventlist.txt"
     )
     await interaction.response.send_message(
         f"Latest 100 visible. Download file to see all {len(rm.evlist)}",
@@ -102,7 +102,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
             f"An alert was sent to the following regions/counties:\n"
             f"- {'\n- '.join(rm_temp.formatted_warned_areas)}\n"
         )
-        await interaction.followup.send(msg1,file=discord.File("eew_temp.png"))
+        await interaction.followup.send(msg1,file=discord.File("data/eew_temp.png"))
     elif before_SA:
         await interaction.followup.send("This earthquake occurred before the launch of ShakeAlert.")
     else:
@@ -120,7 +120,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
             f"Maximum intensity felt in the following cities:\n"
             f"- {'\n- '.join(rm_temp.cities_max_mmi)}\n\n"
         )
-        await interaction.followup.send(msg2,file=discord.File("mmi_temp.png"))
+        await interaction.followup.send(msg2,file=discord.File("data/mmi_temp.png"))
     else:
         msg2_alt = (
             f"On {rm_temp.ev_timestamp}\n"
@@ -219,8 +219,8 @@ async def check_quakes():
                         update=True,
                         update_time=rm.ev_lastupdate
                     )
-                    await msg_to_edit.edit(embed=update_embed,attachments=[discord.File("latest_mmis.png")])
-                    # await msg_to_edit.edit(content=msg_update,attachments=[discord.File("latest_mmis.png")])
+                    await msg_to_edit.edit(embed=update_embed,attachments=[discord.File("data/latest_mmis.png")])
+                    # await msg_to_edit.edit(content=msg_update,attachments=[discord.File("data/latest_mmis.png")])
                     print(f'msg sent')
                 except discord.Forbidden:
                     print(f"No permissions to send message in {channel_id}")
@@ -257,12 +257,12 @@ async def check_quakes():
         # if event has shakealert product, send alert and map
         if rm.has_eew:
             eew_embed = make_eew_embed(rm.formatted_warned_areas)
-            await channel.send(file=discord.File("latest_eew.png"),embed=eew_embed)
-            # await channel.send(msg_eew,file=discord.File("latest_eew.png"))
+            await channel.send(file=discord.File("data/latest_eew.png"),embed=eew_embed)
+            # await channel.send(msg_eew,file=discord.File("data/latest_eew.png"))
         
         if rm.mmi_plottable:
             #if new event, send full new report
-            mmi_map = discord.File("latest_mmis.png")
+            mmi_map = discord.File("data/latest_mmis.png")
             # mmi_msg = await channel.send(msg_mmi,file=mmi_map)
             mmi_embed = make_mmi_embed(
                 rm.mmi_report_caption,
@@ -285,7 +285,7 @@ async def check_quakes():
 
 def read_latest():
     try:
-        with open("latest_report.txt") as f:
+        with open("data/latest_report.txt") as f:
             lines = f.readlines()
             curr_ev_id = lines[0].strip()
             curr_ev_lastupdate = lines[1].strip()
@@ -293,14 +293,18 @@ def read_latest():
     except FileNotFoundError:
         return None
     
-# on file run, create databases if they don't exist
-if not Path("guild_settings.db").is_file():
+# on file run, create data files if they don't exist (others are safe)
+if not Path("data/guild_settings.db").is_file():
     print("guild_settings.db not found. Creating file. Report channels need to be reset.")
     init_guild_table()
 
-if not Path("reports.db").is_file():
+if not Path("data/reports.db").is_file():
     print("reports.db not found. Creating file. Updates will not work on previous events.")
     init_reports_table()
+
+if not Path("data/latest_report.txt").is_file():
+    with open("data/latest_report.txt",'w') as f:
+        f.write("[id]\n10000000")
 
 # run bot
 bot.run(TOKEN)

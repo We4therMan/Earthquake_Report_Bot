@@ -1,7 +1,7 @@
 import sqlite3
 
 def init_guild_table():
-    conn = sqlite3.connect("guild_settings.db")
+    conn = sqlite3.connect("data/guild_settings.db")
     cursor = conn.cursor()
 
     cursor.execute(
@@ -15,7 +15,7 @@ def init_guild_table():
     conn.close()
 
 def set_channel(guild_id: int, channel_id: int):
-    conn = sqlite3.connect("guild_settings.db")
+    conn = sqlite3.connect("data/guild_settings.db")
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -29,7 +29,7 @@ def set_channel(guild_id: int, channel_id: int):
     conn.close()
 
 def get_channel(guild_id: int):
-    conn = sqlite3.connect("guild_settings.db")
+    conn = sqlite3.connect("data/guild_settings.db")
     cursor = conn.cursor()
 
     cursor.execute(

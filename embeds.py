@@ -60,7 +60,7 @@ def make_eew_embed(area_list):
     formatted_list = f"- {'\n- '.join(area_list)}"
     embed.add_field(name="Counties/Regions",value=formatted_list, inline=True)
 
-    fname = "latest_eew.png"
+    fname = "data/latest_eew.png"
     embed.set_image(url=f'attachment://{fname}')
 
     return embed
@@ -80,7 +80,7 @@ def make_mmi_embed(mmi_caption,url,ev_time,mag,max_mmi,mmi_desc,cities_max_mmi,u
     formatted_list = f"- {'\n- '.join(cities_max_mmi)}"
     embed.add_field(name="Maximum intensity in:",value=formatted_list,inline=False)
 
-    fname = "latest_mmis.png"
+    fname = "data/latest_mmis.png"
     embed.set_image(url=f'attachment://{fname}')
 
     if update:

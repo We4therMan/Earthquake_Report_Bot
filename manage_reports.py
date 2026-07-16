@@ -1,7 +1,7 @@
 import sqlite3
 
 def init_reports_table():
-    conn = sqlite3.connect("reports.db")
+    conn = sqlite3.connect("data/reports.db")
     cursor = conn.cursor()
 
     cursor.execute(
@@ -20,7 +20,7 @@ def init_reports_table():
 
 def store_report_msg(ev_id, guild_id, channel_id, message_id):
     """add (ev_id, guild_id, channel_id, message_id) to table"""
-    conn = sqlite3.connect("reports.db")
+    conn = sqlite3.connect("data/reports.db")
     cursor = conn.cursor()
 
     sql = "INSERT OR REPLACE INTO reports VALUES (?, ?, ?, ?)"
@@ -35,7 +35,7 @@ def select_report_msgs(ev_id):
     """Return list of tuples for ev_id
     [(guild,channel,msg),...]
     """
-    conn = sqlite3.connect("reports.db")
+    conn = sqlite3.connect("data/reports.db")
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     

@@ -116,7 +116,7 @@ class ReportMaker:
         self.ev_url = event['properties']['url']
 
         # write txt
-        fname = "temp_report.txt" if is_temp else "latest_report.txt"
+        fname = "data/temp_report.txt" if is_temp else "data/latest_report.txt"
         with open(fname,"w") as f:
             f.write(f"{self.ev_id}\n{self.ev_lastupdate}")
 
@@ -407,7 +407,7 @@ class ReportMaker:
             # plot_polygon(alert_poly)
 
             # axi.set_title(f"Example: {event['properties']['title']}, threshold {MMI}")
-            fname = "eew_temp.png" if is_temp else "latest_eew.png"
+            fname = "data/eew_temp.png" if is_temp else "data/latest_eew.png"
             plt.savefig(fname,bbox_inches='tight')
             if show: plt.show()
             else: plt.close()
@@ -591,7 +591,7 @@ class ReportMaker:
             axi.scatter(epix,epiy,marker='X',c='r',ec='white',linewidths=2,s=750)
 
             # axi.set_title(f"Example: {event['properties']['title']}")
-            fname = "mmi_temp.png" if is_temp else "latest_mmis.png"
+            fname = "data/mmi_temp.png" if is_temp else "data/latest_mmis.png"
             plt.savefig(fname,bbox_inches='tight')
             if show: plt.show()
             else: plt.close()
@@ -688,7 +688,7 @@ class ReportMaker:
             </html>
             """, subtype="html")
 
-            image_path = 'latest_mmis.png'
+            image_path = 'data/latest_mmis.png'
             with open(image_path, "rb") as f:
                 msg.get_payload()[0].add_related(
                     f.read(), 
