@@ -19,7 +19,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     # await bot.tree.sync()
     print([guild.name for guild in bot.guilds])
-    print([get_channel(guild.id).name for guild in bot.guilds])
+    print([get_channel(guild.id) for guild in bot.guilds])
     print(f"Bot connected. Logged in as {bot.user}")
     for guild in bot.guilds:
         channel_id = get_channel(guild.id)
