@@ -641,7 +641,7 @@ class ReportMaker:
                 f"- {"\n- ".join(self.cities_max_mmi)}\n"
                 f"If you felt this earthquake, visit {self.ev_url+"/tellus"}"
                 f" to fill out a Did You Feel It report.\n\n"
-                f"_Last updated {format_usgs_time(self.ev_lastupdate)}_"
+                f"Last updated {format_usgs_time(self.ev_lastupdate)}"
             )
         
         elif report_type == "nomap":

@@ -1,5 +1,7 @@
 import discord
 from discord.ext import commands
+from datetime import datetime
+from USGSreportmaker import format_usgs_time
 
 class EventListView(discord.ui.View):
     def __init__(self, events, per_page=20):
@@ -53,31 +55,47 @@ def make_eew_embed(area_list):
     embed = discord.Embed(
         title="Earthquake Early Warning",
         description="A new ShakeAlert product has been published by the USGS",
-        color='#eb1e25',
+        color=discord.Colour.red(),
     )
-
-    embed.add_field(name="Counties/Regions",value=area_list, inline=True)
+    formatted_list = f"- {'\n- '.join(area_list)}"
+    embed.add_field(name="Counties/Regions",value=formatted_list, inline=True)
 
     fname = "latest_eew.png"
-    warning_map = discord.File(fname, filename=fname)
     embed.set_image(url=f'attachment://{fname}')
 
     return embed
 
-def make_mmi_embed(mmi_caption,mag,max_mmi,cities_max_mmi):
+def make_mmi_embed(mmi_caption,url,ev_time,mag,max_mmi,mmi_desc,cities_max_mmi,update=False,update_time=None):
+    embed = discord.Embed(
+        title="USGS Earthquake Report (Updated)" if update else "USGS Earthquake Report",
+        description=mmi_caption,
+        url = url,
+        color=discord.Colour.green(),
+    )
+
+    embed.add_field(name="Time",value=ev_time,inline=True)
+    embed.add_field(name="Magnitude",value=mag, inline=True)
+    embed.add_field(name="Max. intensity",value=f"{max_mmi} ({mmi_desc})",inline=True)
+
+    formatted_list = f"- {'\n- '.join(cities_max_mmi)}"
+    embed.add_field(name="Maximum intensity in:",value=formatted_list,inline=False)
+
+    fname = "latest_mmis.png"
+    embed.set_image(url=f'attachment://{fname}')
+
+    if update:
+        t = format_usgs_time(update_time)
+        embed.set_footer(text=f"_Last updated {t}_")
+
+    return embed
+
+def make_nomap_embed(ev_time,mag,url):
     embed = discord.Embed(
         title="USGS Earthquake Report",
-        description=mmi_caption,
-        color="#16eb21",
+        description=f"On {ev_time}, an earthquake occurred in the region.\nNo intensity-by-city data is available for this earthquake",
     )
 
     embed.add_field(name="Magnitude",value=mag, inline=True)
-    embed.add_field(name="Max. intensity",value=max_mmi,inline=True)
-
-    embed.add_field(name="Max. intensity in:",value=cities_max_mmi)
-
-    fname = "latest_mmi.png"
-    warning_map = discord.File(fname, filename=fname)
-    embed.set_image(url=f'attachment://{fname}')
+    embed.add_field(name="Additional info",value={url})
 
     return embed

@@ -8,7 +8,7 @@ from config import TOKEN
 from USGSreportmaker import ReportMaker, format_usgs_time
 from manage_guilds import init_guild_table, set_channel, get_channel
 from manage_reports import init_reports_table, store_report_msg, select_report_msgs
-from embeds import EventListView
+from embeds import EventListView, make_eew_embed, make_mmi_embed, make_nomap_embed
 from datetime import datetime, UTC
 from zoneinfo import ZoneInfo
 
@@ -34,8 +34,8 @@ async def on_ready():
             except discord.NotFound:
                 continue
         try:
-            # await channel.send(f"_Good morning everyone. I have just been activated and the time is {datetime.now().strftime("%b %d, %Y %I:%M %p")}_")
-            await channel.send("minasan, konbanwa ^w^")
+            await channel.send(f"_Good morning everyone. I have just been activated and the time is {datetime.now().strftime("%b %d, %Y %I:%M %p")}_")
+            # await channel.send("minasan, konbanwa ^w^")
         except discord.Forbidden:
             print(f"No permission to write in {guild.name}. Removing to avoid errors. Use /setchannel to reset.")
             set_channel(guild.id, 0)
@@ -100,7 +100,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
         msg1 = (
             f"This earthquake triggered ShakeAlert.\n"
             f"An alert was sent to the following regions/counties:\n"
-            f"-{'\n-'.join(rm_temp.formatted_warned_areas)}\n"
+            f"- {'\n- '.join(rm_temp.formatted_warned_areas)}\n"
         )
         await interaction.followup.send(msg1,file=discord.File("eew_temp.png"))
     elif before_SA:
@@ -118,7 +118,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
             f"Magnitude: {rm_temp.ev_mag}\n"
             f"Maximum intensity: {rm_temp.ev_maxnumeral} ({rm_temp.ev_maxdesc})\n"
             f"Maximum intensity felt in the following cities:\n"
-            f"-{'\n-'.join(rm_temp.cities_max_mmi)}\n\n"
+            f"- {'\n- '.join(rm_temp.cities_max_mmi)}\n\n"
         )
         await interaction.followup.send(msg2,file=discord.File("mmi_temp.png"))
     else:
@@ -208,7 +208,19 @@ async def check_quakes():
                         print(f"Original report message in {channel_id} not found. It may have been deleted.")
                         continue
                 try:
-                    await msg_to_edit.edit(content=msg_update,attachments=[discord.File("latest_mmis.png")])
+                    update_embed = make_mmi_embed(
+                        rm.mmi_report_caption,
+                        rm.ev_url,
+                        rm.ev_timestamp,
+                        rm.ev_mag,
+                        rm.ev_maxnumeral,
+                        rm.ev_maxdesc,
+                        rm.cities_max_mmi,
+                        update=True,
+                        update_time=rm.ev_lastupdate
+                    )
+                    await msg_to_edit.edit(embed=update_embed,attachments=[discord.File("latest_mmis.png")])
+                    # await msg_to_edit.edit(content=msg_update,attachments=[discord.File("latest_mmis.png")])
                     print(f'msg sent')
                 except discord.Forbidden:
                     print(f"No permissions to send message in {channel_id}")
@@ -244,18 +256,31 @@ async def check_quakes():
         # in each report channel
         # if event has shakealert product, send alert and map
         if rm.has_eew:
-            await channel.send(msg_eew,file=discord.File("latest_eew.png"))
+            eew_embed = make_eew_embed(rm.formatted_warned_areas)
+            await channel.send(file=discord.File("latest_eew.png"),embed=eew_embed)
+            # await channel.send(msg_eew,file=discord.File("latest_eew.png"))
         
         if rm.mmi_plottable:
-            mmi_map = discord.File("latest_mmis.png")
             #if new event, send full new report
-            mmi_msg = await channel.send(msg_mmi,file=mmi_map)
+            mmi_map = discord.File("latest_mmis.png")
+            # mmi_msg = await channel.send(msg_mmi,file=mmi_map)
+            mmi_embed = make_mmi_embed(
+                rm.mmi_report_caption,
+                rm.ev_url,
+                rm.ev_timestamp,
+                rm.ev_mag,
+                rm.ev_maxnumeral,
+                rm.ev_maxdesc,
+                rm.cities_max_mmi
+                )
+            mmi_msg = await channel.send(file=mmi_map, embed=mmi_embed)
             store_report_msg(rm.ev_id, mmi_msg.guild.id, mmi_msg.channel.id, mmi_msg.id)
 
         # if event not mappable
         else:
-            msg_nomap = rm.format_report_msg("nomap",index)
-            nomap_msg = await channel.send(msg_nomap)
+            # msg_nomap = rm.format_report_msg("nomap",index)
+            # nomap_msg = await channel.send(msg_nomap)
+            nomap_msg = await channel.send(embed=make_nomap_embed(rm.ev_timestamp,rm.ev_mag,rm.ev_url))
             store_report_msg(rm.ev_id, nomap_msg.guild.id, nomap_msg.channel.id, nomap_msg.id)
 
 def read_latest():
