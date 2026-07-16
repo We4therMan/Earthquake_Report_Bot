@@ -18,8 +18,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     # await bot.tree.sync()
-    print([guild.id for guild in bot.guilds])
-    print([get_channel(guild.id) for guild in bot.guilds])
+    print([guild.name for guild in bot.guilds])
+    print([get_channel(guild.id).name for guild in bot.guilds])
     print(f"Bot connected. Logged in as {bot.user}")
     for guild in bot.guilds:
         channel_id = get_channel(guild.id)
@@ -34,7 +34,8 @@ async def on_ready():
             except discord.NotFound:
                 continue
         try:
-            await channel.send(f"_Good morning everyone. I have just been activated and the time is {datetime.now().strftime("%b %d, %Y %I:%M %p")}_")
+            print(f"Logged into {guild.name}")
+            # await channel.send(f"_Good morning everyone. I have just been activated and the time is {datetime.now().strftime("%b %d, %Y %I:%M %p")}_")
             # await channel.send("minasan, konbanwa ^w^")
         except discord.Forbidden:
             print(f"No permission to write in {guild.name}. Removing to avoid errors. Use /setchannel to reset.")
