@@ -88,20 +88,21 @@ async def viewevent(interaction: discord.Interaction, index: int):
     rm_temp = ReportMaker() # new insance to avoid editing the auto-reports
 
     rm_temp.load_ev_detail(index,is_temp=True)
-    rm_temp.get_eew_data()
+    # rm_temp.get_eew_data()
 
     # check if event happened before launch of ShakeAlert
     tformat = "%b %d, %Y %I:%M %p"
     SAlaunch = "Oct 1, 2019 12:00 AM"
     before_SA = datetime.strptime(rm_temp.ev_timestamp,tformat) < datetime.strptime(SAlaunch,tformat)
 
+    rm_temp.make_eew_map(is_temp=True)
     if rm_temp.has_eew:
         await status.edit(content="Loading ShakeAlert data.")
-        rm_temp.make_eew_map(is_temp=True)
+        
         msg1 = (
             f"This earthquake triggered ShakeAlert.\n"
-            f"{rm_temp.eew_caption}"
-            f"Estimated magnitude: {rm.eew_mag}"
+            f"{rm_temp.eew_caption}\n"
+            f"Estimated magnitude: {rm_temp.eew_mag}\n"
             f"An alert was sent to the following regions/counties:\n"
             f"- {'\n- '.join(rm_temp.formatted_warned_areas)}\n"
         )
@@ -122,6 +123,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
             f"Maximum intensity: {rm_temp.ev_maxnumeral} ({rm_temp.ev_maxdesc})\n"
             f"Maximum intensity felt in the following cities:\n"
             f"- {'\n- '.join(rm_temp.cities_max_mmi)}\n\n"
+            f"For more details visit {rm_temp.ev_url}"
         )
         await interaction.followup.send(msg2,file=discord.File("data/mmi_temp.png"))
     else:
@@ -132,7 +134,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
             f"For more details visit {rm_temp.ev_url}"
         )
         await interaction.followup.send(msg2_alt)
-    await status.edit(content=f"Finished loading event {':\n'.join(rm.evlist[index])}...")
+    await status.edit(content=f"Finished loading event {':\n'.join(rm.evlist[index])}!")
 
 
 @bot.command()

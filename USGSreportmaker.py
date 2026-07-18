@@ -251,19 +251,18 @@ class ReportMaker:
         return box_color, txt_color, fnt_weight, fnt_size, numeral, description
 
     def mag_style(self,mag):
-        """Manages strength-related language depending on the magnitude of the earthquake."""
-        if mag <= 4.0:
-            desc = "A minor earthquake"
-        if 4.0 <= mag < 5.2:
-            desc = "A moderate earthquake"
-        if 5.3 <= mag < 5.9:
-            desc = "A moderately strong earthquake"
-        if 6.0 <= mag < 6.6:
-            desc = "A very strong earthquake"
-        if mag >= 6.7:
-            desc = "A major earthquake"
-
-        return desc
+        """Manages strength-related language depending on the magnitude of the earthquake.
+            mag: [float]
+        """
+        if mag < 4.0:
+            return "A minor earthquake"
+        if mag < 5.3:
+            return "A moderate earthquake"
+        if mag < 5.9:
+            return "A moderately strong earthquake"
+        if mag < 6.7:
+            return "A very strong earthquake"
+        return "A major earthquake"
 
     def get_eew_data(self):
         """Defines alert polygon and epicenter coords from features.
@@ -324,7 +323,8 @@ class ReportMaker:
 
             self.regions_used = False
 
-            if len("".join(warned_names)) >= 75:
+            # format if more than 7 names for readability
+            if len(warned_names) >= 7:
                 warned_areas = list(warned_names)
                 condensed_counties = set()
 
@@ -398,7 +398,8 @@ class ReportMaker:
             if epi_mask.any():
                 # if epicenter is within a polygon
                 epi_county = self.ca_nv[epi_mask]['NAME'].to_list()[0]
-                epi_statefp = self.ca_nv[epi_mask]['STATEFP']
+                epi_statefp = self.ca_nv[epi_mask]['STATEFP'].to_list()[0]
+                print(epi_statefp)
                 epi_state = name_from_fp(epi_statefp)
                 self.eew_caption = f'{desc} was detected in {epi_county} County, {epi_state}'
             else:
@@ -406,7 +407,7 @@ class ReportMaker:
                 # better method needed for events onshore off region (e.g. in Oregon, Utah, Mexico, etc.)
                 county_closest = self.ca_nv.distance(Point(self.eew_epix,self.eew_epiy)).sort_values().index[0]
                 epi_county = self.ca_nv.loc[county_closest]["NAME"]
-                epi_statefp = self.ca_nv[epi_mask]['STATEFP']
+                epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
                 epi_state = name_from_fp(epi_statefp)
                 self.eew_caption = f'{desc} was detected in {epi_county} County, {epi_state}'
 
@@ -553,7 +554,7 @@ class ReportMaker:
             if epi_mask.any():
                 # if epicenter is within a polygon
                 epi_county = self.ca_nv[epi_mask]['NAME'].to_list()[0]
-                epi_statefp = self.ca_nv[epi_mask]['STATEFP']
+                epi_statefp = self.ca_nv[epi_mask]['STATEFP'].to_list()[0]
                 epi_state = name_from_fp(epi_statefp)
                 caption = f'{desc} occurred in {epi_county} County, {epi_state}'
             else:
@@ -561,7 +562,7 @@ class ReportMaker:
                 # better method needed for events onshore off region (e.g. in Oregon, Utah, Mexico, etc.)
                 county_closest = self.ca_nv.distance(Point(epix,epiy)).sort_values().index[0]
                 epi_county = self.ca_nv.loc[county_closest]["NAME"]
-                epi_statefp = self.ca_nv[epi_mask]['STATEFP']
+                epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
                 epi_state = name_from_fp(epi_statefp)
                 caption = f'{desc} occurred in {epi_county} County, {epi_state}'
             self.mmi_report_caption = caption
