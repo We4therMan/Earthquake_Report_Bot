@@ -51,12 +51,15 @@ class EventListView(discord.ui.View):
         else:
             await interaction.response.defer()
 
-def make_eew_embed(area_list):
+def make_eew_embed(mag,area_list):
     embed = discord.Embed(
         title="Earthquake Early Warning",
         description="A new ShakeAlert product has been published by the USGS",
         color=discord.Colour.red(),
     )
+    
+    embed.add_field(name="Estimated magnitude", value=mag)
+
     formatted_list = f"- {'\n- '.join(area_list)}"
     embed.add_field(name="Counties/Regions",value=formatted_list, inline=True)
 

@@ -258,7 +258,7 @@ async def check_quakes():
         # in each report channel
         # if event has shakealert product, send alert and map
         if rm.has_eew:
-            eew_embed = make_eew_embed(rm.formatted_warned_areas)
+            eew_embed = make_eew_embed(rm.eew_mag,rm.formatted_warned_areas)
             await channel.send(file=discord.File("data/latest_eew.png",filename="latest_eew.png"),embed=eew_embed)
             # await channel.send(msg_eew,file=discord.File("data/latest_eew.png"))
         

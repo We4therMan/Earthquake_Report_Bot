@@ -62,29 +62,29 @@ class ReportMaker:
             return
         
         # initialize all attributes (avoid errors for not existing)
-        self.evlist = None
-        self.ev_id = None
-        self.ev_lastupdate = None
-        self.ev_url = None
-        self.ev_timestamp = None
-        self.ev_detail = None
-        self.has_eew = False
-        self.alert_poly = None
-        self.eew_epix = None
-        self.eew_epiy = None
-        self.alert_colors = None
-        self.regions_used = None
-        self.formatted_warned_areas = []
+        self.evlist = None # indexed list of events from query
+        self.ev_id = None # USGS event ID
+        self.ev_lastupdate = None # time of last USGS update to event (if any)
+        self.ev_url = None # link to executive USGS page for event
+        self.ev_timestamp = None # formatted time string for earthquake origin
+        self.ev_detail = None 
+        self.has_eew = False # does event have a ShakeAlert product?
+        self.alert_poly = None # alert polygon (used to find alerted counties)
+        self.eew_epix = None # alert epicenter x coord
+        self.eew_epiy = None # alert epicenter y coord
+        self.alert_colors = None # geopandas mask for alerted counties
+        self.regions_used = None # were counties condensed into regions?
+        self.formatted_warned_areas = [] 
         self.mmi_report_caption = ""
         self.city_names = []
         self.mmi_coord_pairs = []
         self.mmis = []
-        self.mmi_plottable = False
+        self.mmi_plottable = False # is there data to map MMI?
         self.cities_max_mmi = []
         self.dyfi_used = False
-        self.ev_mag = None
-        self.ev_epix = None
-        self.ev_epiy = None
+        self.ev_mag = None # true magnitude
+        self.ev_epix = None # true epicenter x coord
+        self.ev_epiy = None # true epicenter y coord
         self.ev_maxnumeral = None
         self.ev_maxdesc = None
 
@@ -271,7 +271,7 @@ class ReportMaker:
         try:
             eew_url = self.ev_detail['properties']['products']['shake-alert'][-1]['contents']['summary.json']['url']
             r3 = requests.get(eew_url)
-            eew_data = r3.json()
+            self.eew_data = r3.json()
             self.has_eew = True
             print('EEW report loaded')
         except:
@@ -281,16 +281,18 @@ class ReportMaker:
         
         # get epi and poly from eew report
         try:
-            alert = eew_data['alerts'][-1]['features']
+            falert = self.eew_data['alerts'][-1]['features']
+            self.eew_mag = self.eew_data['alerts'][-1]['properties']['magnitude']
         except:
             try:
                 # old (before around 2022) format. Get final update for simplicity
-                alert = eew_data['final_alert']['features']
+                falert = self.eew_data['final_alert']['features']
+                self.eew_mag = self.eew_data['final_alert']['properties']['magnitude']
             except:
                 print("Error parsing alert data. Check alert json format.")
                 return
 
-        for feature in alert:
+        for feature in falert:
             if feature.get('id') == 'Epicenter' or feature.get('id') == 'finalEpicenter':
                 epi_feat = feature
                 continue
