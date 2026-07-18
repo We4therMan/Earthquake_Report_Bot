@@ -60,7 +60,7 @@ def make_eew_embed(area_list):
     formatted_list = f"- {'\n- '.join(area_list)}"
     embed.add_field(name="Counties/Regions",value=formatted_list, inline=True)
 
-    fname = "data/latest_eew.png"
+    fname = "latest_eew.png"
     embed.set_image(url=f'attachment://{fname}')
 
     return embed
@@ -80,12 +80,12 @@ def make_mmi_embed(mmi_caption,url,ev_time,mag,max_mmi,mmi_desc,cities_max_mmi,u
     formatted_list = f"- {'\n- '.join(cities_max_mmi)}"
     embed.add_field(name="Maximum intensity in:",value=formatted_list,inline=False)
 
-    fname = "data/latest_mmis.png"
+    fname = "latest_mmis.png"
     embed.set_image(url=f'attachment://{fname}')
 
     if update:
         t = format_usgs_time(update_time)
-        embed.set_footer(text=f"_Last updated {t}_")
+        embed.set_footer(text=f"Last updated {t}")
 
     return embed
 
@@ -96,6 +96,6 @@ def make_nomap_embed(ev_time,mag,url):
     )
 
     embed.add_field(name="Magnitude",value=mag, inline=True)
-    embed.add_field(name="Additional info",value={url})
+    embed.add_field(name="Additional info",value=url)
 
     return embed

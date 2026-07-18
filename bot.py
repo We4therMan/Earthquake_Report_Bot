@@ -71,7 +71,7 @@ async def eventlist(interaction: discord.Interaction):
         filename="data/eventlist.txt"
     )
     await interaction.response.send_message(
-        f"Latest 100 visible. Download file to see all {len(rm.evlist)}",
+        f"Latest 100 visible. Download file to see all {len(rm.evlist)} events.",
         file=file,
         ephemeral=True
         )
@@ -220,7 +220,8 @@ async def check_quakes():
                         update=True,
                         update_time=rm.ev_lastupdate
                     )
-                    await msg_to_edit.edit(embed=update_embed,attachments=[discord.File("data/latest_mmis.png")])
+                    img = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
+                    await msg_to_edit.edit(embed=update_embed,attachments=[img])
                     # await msg_to_edit.edit(content=msg_update,attachments=[discord.File("data/latest_mmis.png")])
                     print(f'msg sent')
                 except discord.Forbidden:
@@ -258,7 +259,7 @@ async def check_quakes():
         # if event has shakealert product, send alert and map
         if rm.has_eew:
             eew_embed = make_eew_embed(rm.formatted_warned_areas)
-            await channel.send(file=discord.File("data/latest_eew.png"),embed=eew_embed)
+            await channel.send(file=discord.File("data/latest_eew.png",filename="latest_eew.png"),embed=eew_embed)
             # await channel.send(msg_eew,file=discord.File("data/latest_eew.png"))
         
         if rm.mmi_plottable:
