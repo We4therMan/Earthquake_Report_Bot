@@ -100,6 +100,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
         rm_temp.make_eew_map(is_temp=True)
         msg1 = (
             f"This earthquake triggered ShakeAlert.\n"
+            f"Estimated magnitude: {rm.eew_mag}"
             f"An alert was sent to the following regions/counties:\n"
             f"- {'\n- '.join(rm_temp.formatted_warned_areas)}\n"
         )
