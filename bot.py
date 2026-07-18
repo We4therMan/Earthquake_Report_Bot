@@ -100,6 +100,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
         rm_temp.make_eew_map(is_temp=True)
         msg1 = (
             f"This earthquake triggered ShakeAlert.\n"
+            f"{rm_temp.eew_caption}"
             f"Estimated magnitude: {rm.eew_mag}"
             f"An alert was sent to the following regions/counties:\n"
             f"- {'\n- '.join(rm_temp.formatted_warned_areas)}\n"
@@ -131,7 +132,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
             f"For more details visit {rm_temp.ev_url}"
         )
         await interaction.followup.send(msg2_alt)
-    await status.edit(content="Done!")
+    await status.edit(content=f"Finished loading event {':\n'.join(rm.evlist[index])}...")
 
 
 @bot.command()
@@ -259,7 +260,7 @@ async def check_quakes():
         # in each report channel
         # if event has shakealert product, send alert and map
         if rm.has_eew:
-            eew_embed = make_eew_embed(rm.eew_mag,rm.formatted_warned_areas)
+            eew_embed = make_eew_embed(rm.eew_caption,rm.eew_mag,rm.formatted_warned_areas)
             await channel.send(file=discord.File("data/latest_eew.png",filename="latest_eew.png"),embed=eew_embed)
             # await channel.send(msg_eew,file=discord.File("data/latest_eew.png"))
         

@@ -51,10 +51,10 @@ class EventListView(discord.ui.View):
         else:
             await interaction.response.defer()
 
-def make_eew_embed(mag,area_list):
+def make_eew_embed(eew_caption,mag,area_list):
     embed = discord.Embed(
         title="Earthquake Early Warning",
-        description="A new ShakeAlert product has been published by the USGS",
+        description=eew_caption,
         color=discord.Colour.red(),
     )
     
