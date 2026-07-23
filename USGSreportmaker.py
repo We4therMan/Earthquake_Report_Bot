@@ -72,6 +72,7 @@ class ReportMaker:
         self.alert_poly = None # alert polygon (used to find alerted counties)
         self.eew_epix = None # alert epicenter x coord
         self.eew_epiy = None # alert epicenter y coord
+        self.eew_mag = None
         self.alert_colors = None # geopandas mask for alerted counties
         self.regions_used = None # were counties condensed into regions?
         self.formatted_warned_areas = [] 

@@ -8,7 +8,11 @@ from config import TOKEN
 from USGSreportmaker import ReportMaker, format_usgs_time
 from manage_guilds import init_guild_table, set_channel, get_channel
 from manage_reports import init_reports_table, store_report_msg, select_report_msgs
-from embeds import EventListView, make_eew_embed, make_mmi_embed, make_nomap_embed
+from embeds import (make_eew_embed, 
+                    make_mmi_embed, 
+                    make_nomap_embed, 
+                    make_viewevent_eew_embed, 
+                    make_viewevent_mmi_embed)
 from datetime import datetime, UTC
 from zoneinfo import ZoneInfo
 
@@ -92,50 +96,71 @@ async def viewevent(interaction: discord.Interaction, index: int):
 
     # check if event happened before launch of ShakeAlert
     tformat = "%b %d, %Y %I:%M %p"
-    SAlaunch = "Oct 1, 2019 12:00 AM"
+    SAlaunch = "Oct 17, 2019 12:00 AM"
     before_SA = datetime.strptime(rm_temp.ev_timestamp,tformat) < datetime.strptime(SAlaunch,tformat)
 
     rm_temp.make_eew_map(is_temp=True)
     if rm_temp.has_eew:
-        await status.edit(content="Loading ShakeAlert data.")
-        
-        msg1 = (
+        await status.edit(content="Loading ShakeAlert data...")
+        eew_msg = (
             f"This earthquake triggered ShakeAlert.\n"
             f"{rm_temp.eew_caption}\n"
-            f"Estimated magnitude: {rm_temp.eew_mag}\n"
-            f"An alert was sent to the following regions/counties:\n"
-            f"- {'\n- '.join(rm_temp.formatted_warned_areas)}\n"
         )
-        await interaction.followup.send(msg1,file=discord.File("data/eew_temp.png"))
+        temp_eew_embed = make_viewevent_eew_embed(
+            event_title=rm_temp.evlist[index],
+            has_eew=rm_temp.has_eew,
+            viewev_eew_caption=eew_msg,
+            mag=rm_temp.eew_mag,
+            area_list=rm_temp.formatted_warned_areas
+        )
+        eew_temp_img = discord.File("data/eew_temp.png",filename="eew_temp.png")
+        await interaction.followup.send(embed=temp_eew_embed,file=eew_temp_img)
     elif before_SA:
-        await interaction.followup.send("This earthquake occurred before the launch of ShakeAlert.")
+        eew_msg = "This earthquake occurred before the launch of ShakeAlert."
+        temp_eew_embed = make_viewevent_eew_embed(
+                event_title=rm_temp.evlist[index],
+                has_eew=False,
+                viewev_eew_caption=eew_msg
+            )
+        await interaction.followup.send(embed=temp_eew_embed)
     else:
-        await interaction.followup.send("This earthquake did not trigger ShakeAlert.")
+        eew_msg = "This earthquake did not trigger ShakeAlert."
+        temp_eew_embed = make_viewevent_eew_embed(
+                event_title=rm_temp.evlist[index],
+                has_eew=False,
+                viewev_eew_caption=eew_msg
+            )
+        await interaction.followup.send(embed=temp_eew_embed)
 
     await status.edit(content="Loading intensity data.")
     rm_temp.make_mmi_map(is_temp=True)
 
     if rm_temp.mmi_plottable:
-        msg2 = (
-            f"On {rm_temp.ev_timestamp}\n"
-            f"{rm_temp.mmi_report_caption}\n"
-            f"Magnitude: {rm_temp.ev_mag}\n"
-            f"Maximum intensity: {rm_temp.ev_maxnumeral} ({rm_temp.ev_maxdesc})\n"
-            f"Maximum intensity felt in the following cities:\n"
-            f"- {'\n- '.join(rm_temp.cities_max_mmi)}\n\n"
-            f"For more details visit {rm_temp.ev_url}"
+        temp_mmi_embed = make_viewevent_mmi_embed(
+            event_title=rm_temp.evlist[index],
+            viewevent_mmi_caption=rm_temp.mmi_report_caption,
+            ev_time=rm_temp.ev_timestamp,
+            url=rm_temp.ev_url,
+            plottable=rm_temp.mmi_plottable,
+            mag=rm_temp.ev_mag,
+            max_mmi=rm_temp.ev_maxnumeral,
+            mmi_desc=rm_temp.ev_maxdesc,
+            cities_max_mmi=rm_temp.cities_max_mmi
         )
-        await interaction.followup.send(msg2,file=discord.File("data/mmi_temp.png"))
+        mmi_temp_img = discord.File("data/mmi_temp.png",filename="mmi_temp.png")
+        await interaction.followup.send(embed=temp_mmi_embed,file=mmi_temp_img)
+        # await interaction.followup.send(msg2,file=discord.File("data/mmi_temp.png"))
     else:
-        msg2_alt = (
-            f"On {rm_temp.ev_timestamp}\n"
-            f"A magnitude {rm_temp.ev_mag} earthquake occurred in the region.\n"
-            f"No intensity-by-city information is available to plot for this earthquake.\n"
-            f"For more details visit {rm_temp.ev_url}"
-        )
-        await interaction.followup.send(msg2_alt)
-    await status.edit(content=f"Finished loading event {':\n'.join(rm.evlist[index])}!")
+        desc = rm_temp.mmi_report_caption + "\nNo intensity-by-city data is available for this event."
+        temp_nomap = make_viewevent_mmi_embed(
+            event_title=rm_temp.evlist[index],
+            viewevent_mmi_caption=desc,
+            ev_time=rm.ev_timestamp,
+            url=rm_temp.ev_url,
+            plottable=False)
+        await interaction.followup.send(embed=temp_nomap)
 
+    await status.edit(content=f"Finished loading event {':\n'.join(rm.evlist[index])}!")
 
 @bot.command()
 @commands.is_owner()
@@ -263,7 +288,8 @@ async def check_quakes():
         # if event has shakealert product, send alert and map
         if rm.has_eew:
             eew_embed = make_eew_embed(rm.eew_caption,rm.eew_mag,rm.formatted_warned_areas)
-            await channel.send(file=discord.File("data/latest_eew.png",filename="latest_eew.png"),embed=eew_embed)
+            file = discord.File("data/latest_eew.png",filename="latest_eew.png")
+            await channel.send(file=file,embed=eew_embed)
             # await channel.send(msg_eew,file=discord.File("data/latest_eew.png"))
         
         if rm.mmi_plottable:
