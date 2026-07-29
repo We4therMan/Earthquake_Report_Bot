@@ -310,13 +310,21 @@ class ReportMaker:
     def format_warned_area(self):
         if self.has_eew:
             ca_nv = self.ca_nv
+            ca_nv["epi_dist"] = ca_nv.geometry.distance(Point(self.eew_epix,self.eew_epiy))
+            # order by distance
+            ca_nv = ca_nv.sort_values(by="epi_dist")
             ca_nv["intersect_area"] = ca_nv.geometry.intersection(self.alert_poly).area
             ca_nv["cover_ratio"] = ca_nv["intersect_area"] / ca_nv.geometry.area
             # county counted if poly covers at least 5% of the area
             # prevents whole counties being alerted by a mere graze of the poly
             # TODO: find a better method. This is problematic for small events in large counties
             # (lots of examples in San Bernardino County)
-            ca_nv["warned"] = ca_nv["cover_ratio"] > 0.05
+            ca_nv['warned'] = (ca_nv["cover_ratio"] > 0.05)
+            if all(ca_nv['warned']) == False:
+                # if list is empty get closest county
+                # NOTE: this is inacurrate for offshore earthquakes because the polygon may not reach
+                ca_nv.loc[ca_nv.index[0], 'warned'] = True
+            self.ca_nv = ca_nv
             self.alert_colors = ca_nv['warned'].map({True: 'yellow', False: 'white'})
 
             warned_names = ca_nv[ca_nv['warned']==True]['NAME'].tolist()
