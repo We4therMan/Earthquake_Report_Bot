@@ -72,7 +72,7 @@ class ReportMaker:
         self.alert_poly = None # alert polygon (used to find alerted counties)
         self.eew_epix = None # alert epicenter x coord
         self.eew_epiy = None # alert epicenter y coord
-        self.eew_mag = None
+        self.eew_mag = None # estimated alert magnitude
         self.alert_colors = None # geopandas mask for alerted counties
         self.regions_used = None # were counties condensed into regions?
         self.formatted_warned_areas = [] 
@@ -404,7 +404,7 @@ class ReportMaker:
                 epi_state = name_from_fp(epi_statefp)
                 self.eew_caption = f'{desc} was detected in {epi_county} County, {epi_state}'
             else:
-                #if epicenter is off all polygons (assumes offshore)
+                #if epicenter is off all polygons (assumes this means offshore)
                 # better method needed for events onshore off region (e.g. in Oregon, Utah, Mexico, etc.)
                 county_closest = self.ca_nv.distance(Point(self.eew_epix,self.eew_epiy)).sort_values().index[0]
                 epi_county = self.ca_nv.loc[county_closest]["NAME"]
@@ -424,7 +424,7 @@ class ReportMaker:
             clist_style = dict(boxstyle='square', facecolor='blue', edgecolor='k', pad=0.6)
             axi.text(0.5,0.05,warn_text,transform=axi.transAxes,fontsize=18,color='w',fontweight='bold',bbox=clist_style,va='bottom',ha='center')
 
-            axi.scatter(self.eew_epix,self.eew_epiy,marker='X',c='r',ec='white',linewidths=2,s=750)
+            axi.scatter(self.eew_epix,self.eew_epiy,marker='X',c='r',ec='white',linewidths=2,s=750,zorder=2)
             # plot_polygon(alert_poly)
 
             # axi.set_title(f"Example: {event['properties']['title']}, threshold {MMI}")
@@ -614,9 +614,8 @@ class ReportMaker:
 
             axi.set_extent(map_lims)
 
-            axi.scatter(epix,epiy,marker='X',c='r',ec='white',linewidths=2,s=750)
+            axi.scatter(epix,epiy,marker='X',c='r',ec='white',linewidths=2,s=750,zorder=2)
 
-            # axi.set_title(f"Example: {event['properties']['title']}")
             fname = "data/mmi_temp.png" if is_temp else "data/latest_mmis.png"
             plt.savefig(fname,bbox_inches='tight')
             if show: plt.show()

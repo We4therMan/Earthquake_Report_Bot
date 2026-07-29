@@ -5,16 +5,20 @@ from discord.ext import commands
 from io import StringIO
 from pathlib import Path
 from config import TOKEN
+from datetime import datetime, UTC
+from zoneinfo import ZoneInfo
+
 from USGSreportmaker import ReportMaker, format_usgs_time
 from manage_guilds import init_guild_table, set_channel, get_channel
-from manage_reports import init_reports_table, store_report_msg, select_report_msgs
+from manage_reports import (make_table, 
+                            store_msg, 
+                            select_msgs)
 from embeds import (make_eew_embed, 
                     make_mmi_embed, 
                     make_nomap_embed, 
                     make_viewevent_eew_embed, 
                     make_viewevent_mmi_embed)
-from datetime import datetime, UTC
-from zoneinfo import ZoneInfo
+
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -170,18 +174,34 @@ async def sync(ctx):
 
 @bot.command()
 @commands.is_owner()
-async def testsync(ctx):
-    # Creates a mock server object using your test server ID
-    guild = discord.Object(id=994313879029030953) 
-    
-    # Copies your global commands over to this specific server scope
-    bot.tree.copy_global_to(guild=guild)
-    
-    # Syncs directly to that server instantly
-    synced = await bot.tree.sync(guild=guild)
-    await ctx.send(f"Instantly synced {len(synced)} commands to test server.")
-    synced = await bot.tree.sync()
-    await ctx.send(f"Synced {len(synced)} commands globally.")
+async def testmsg(ctx):
+    test_nomap_embed = make_nomap_embed(
+        "July 26, 2026",
+        "A major earthquake",
+        7.2,
+        "https://earthquake.usgs.gov/earthquakes/eventpage/official19060418131226300_12/executive"
+    )
+    test_mmi_embed = make_mmi_embed(
+        "A major earthquake occured off San Francisco County",
+        "https://earthquake.usgs.gov/earthquakes/eventpage/official19060418131226300_12/executive",
+        "July 26, 2026",
+        7.2,
+        "IX",
+        "Violent",
+        ["San Francisco","Oakland","Berkeley"]
+    )
+    test_eew_embed = make_eew_embed(
+        "A major earthquake was detected off San Francisco County",
+        7.5,
+        ["Bay Area", "North Coast", "Sacramento Valley"]
+    )
+    embeds = [test_nomap_embed,test_eew_embed,test_mmi_embed]
+    imgs = [
+        discord.File("data/latest_mmis.png",filename="latest_mmis.png"),
+        discord.File("data/latest_eew.png",filename="latest_eew.png")
+             ]
+    testmsg = await ctx.send(embeds=embeds,files=imgs)
+    print(testmsg)
 
 @tasks.loop(minutes=1)
 async def check_quakes():
@@ -196,7 +216,6 @@ async def check_quakes():
     index = 0 # falsy if 0, used in format_report_msg
     rm.load_ev_detail(index=index)
 
-    ev_updated = False
     # if last bot event is same as API last event
     if curr_ev_id == rm.ev_id:
         print("No new event.")
@@ -205,16 +224,52 @@ async def check_quakes():
             # do nothing if no updates
             print("No updates on latest event.")
             return
+        # ----------------- IF EVENT IS UPDATED -------------------------
         else:
             # if updated, write update message, remake mmi map
             # no need for new eew map
             print("Latest event updated.")
-            ev_updated = True
+            rm.make_eew_map()
             rm.make_mmi_map()
-            msg_update = rm.format_report_msg("update",index)
 
             # edit all existing reports
-            for sent_report in select_report_msgs(rm.ev_id):
+            for sent_report in select_msgs(rm.ev_id):
+                update_embeds = []
+                update_imgs = []
+                if rm.has_eew:
+                    eew_update_embed = make_eew_embed(
+                        rm.eew_caption,
+                        rm.eew_mag,
+                        rm.formatted_warned_areas
+                    )
+                    eew_update_img = discord.File("data/latest_eew.png",filename="latest_eew.png")
+                    update_embeds.append(eew_update_embed)
+                    update_imgs.append(eew_update_img)
+
+                if rm.mmi_plottable:
+                    mmi_update_embed = make_mmi_embed(
+                        rm.mmi_report_caption,
+                        rm.ev_url,
+                        rm.ev_timestamp,
+                        rm.ev_mag,
+                        rm.ev_maxnumeral,
+                        rm.ev_maxdesc,
+                        rm.cities_max_mmi,
+                        update=True,
+                        update_time=rm.ev_lastupdate
+                        )
+                    mmi_update_img = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
+                    update_embeds.append(mmi_update_embed)
+                    update_imgs.append(mmi_update_img)
+                # if event still doesn't have mmi data after this update
+                else:
+                    nomap_update_embed = make_nomap_embed(
+                        rm.ev_timestamp,
+                        rm.ev_mag,
+                        rm.ev_url
+                    )
+                    update_embeds.append(nomap_update_embed)
+
                 guild_id, channel_id, msg_id = sent_report
                 print(f"Fetching msg {msg_id}")
                 # get channel id from bot chache
@@ -237,26 +292,14 @@ async def check_quakes():
                     except:
                         print(f"Original report message in {channel_id} not found. It may have been deleted.")
                         continue
+                # edit message
                 try:
-                    update_embed = make_mmi_embed(
-                        rm.mmi_report_caption,
-                        rm.ev_url,
-                        rm.ev_timestamp,
-                        rm.ev_mag,
-                        rm.ev_maxnumeral,
-                        rm.ev_maxdesc,
-                        rm.cities_max_mmi,
-                        update=True,
-                        update_time=rm.ev_lastupdate
-                    )
-                    img = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
-                    await msg_to_edit.edit(embed=update_embed,attachments=[img])
-                    # await msg_to_edit.edit(content=msg_update,attachments=[discord.File("data/latest_mmis.png")])
+                    await msg_to_edit.edit(embeds=update_embeds,attachments=update_imgs)
                     print(f'msg sent')
                 except discord.Forbidden:
-                    print(f"No permissions to send message in {channel_id}")
+                    print(f"No permissions to edit message in {channel_id}")
                     continue
-            # exit function after loop is done
+            # finish function after loop is done
             return
     else:
         # it's a new event 
@@ -268,8 +311,47 @@ async def check_quakes():
         msg_eew = rm.format_report_msg("eew",index)
         msg_mmi = rm.format_report_msg("mmi",index)
 
+    # ---------------------------- FOR NEW EVENTS -----------------------------
     print("Broadcasting messages")
     for guild in bot.guilds:
+        embeds = []
+        imgs = []
+        if rm.has_eew:
+            # reports usually don't have shakealert data ready upon first publication
+            # it usually takes USGS a couple minutes to publish shakealert reports
+            # this block will likely never run but it should run safely in case the timing is right
+            eew_embed = make_eew_embed(
+                rm.eew_caption,
+                rm.eew_mag,
+                rm.formatted_warned_areas
+            )
+            eew_map = discord.File("data/latest_eew.png",filename="latest_eew.png")
+            embeds.append(eew_embed)
+            imgs.append(eew_map)
+
+        if rm.mmi_plottable:
+            mmi_embed = make_mmi_embed(
+                rm.mmi_report_caption,
+                rm.ev_url,
+                rm.ev_timestamp,
+                rm.ev_mag,
+                rm.ev_maxnumeral,
+                rm.ev_maxdesc,
+                rm.cities_max_mmi
+            )
+            mmi_map = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
+            embeds.append(mmi_embed)
+            imgs.append(mmi_map)
+
+        # if no mmi data yet
+        else:
+            nomap_embed = make_nomap_embed(
+                rm.ev_timestamp,
+                rm.ev_mag,
+                rm.ev_url
+            )
+            embeds.append(nomap_embed)
+
         channel_id = get_channel(guild.id)
         if not channel_id:
             print(f"No channel set for guild {guild.name}. Use /setchannel (channel name) to set a channel.")
@@ -283,37 +365,8 @@ async def check_quakes():
                 continue
             except discord.Forbidden:
                 continue
-
-        # in each report channel
-        # if event has shakealert product, send alert and map
-        if rm.has_eew:
-            eew_embed = make_eew_embed(rm.eew_caption,rm.eew_mag,rm.formatted_warned_areas)
-            file = discord.File("data/latest_eew.png",filename="latest_eew.png")
-            await channel.send(file=file,embed=eew_embed)
-            # await channel.send(msg_eew,file=discord.File("data/latest_eew.png"))
-        
-        if rm.mmi_plottable:
-            #if new event, send full new report
-            mmi_map = discord.File("data/latest_mmis.png")
-            # mmi_msg = await channel.send(msg_mmi,file=mmi_map)
-            mmi_embed = make_mmi_embed(
-                rm.mmi_report_caption,
-                rm.ev_url,
-                rm.ev_timestamp,
-                rm.ev_mag,
-                rm.ev_maxnumeral,
-                rm.ev_maxdesc,
-                rm.cities_max_mmi
-                )
-            mmi_msg = await channel.send(file=mmi_map, embed=mmi_embed)
-            store_report_msg(rm.ev_id, mmi_msg.guild.id, mmi_msg.channel.id, mmi_msg.id)
-
-        # if event not mappable
-        else:
-            # msg_nomap = rm.format_report_msg("nomap",index)
-            # nomap_msg = await channel.send(msg_nomap)
-            nomap_msg = await channel.send(embed=make_nomap_embed(rm.ev_timestamp,rm.ev_mag,rm.ev_url))
-            store_report_msg(rm.ev_id, nomap_msg.guild.id, nomap_msg.channel.id, nomap_msg.id)
+        sent_msg = await channel.send(embeds=embeds,files=imgs)
+        store_msg(rm.ev_id, sent_msg.guild.id, sent_msg.channel.id, sent_msg.id)
 
 def read_latest():
     try:
@@ -330,9 +383,9 @@ if not Path("data/guild_settings.db").is_file():
     print("guild_settings.db not found. Creating file. Report channels need to be reset.")
     init_guild_table()
 
-if not Path("data/reports.db").is_file():
-    print("reports.db not found. Creating file. Updates will not work on previous events.")
-    init_reports_table()
+if not Path("data/messages.db").is_file():
+    print("messages.db not found. Creating file. Updates will not work on previous events.")
+    make_table()
 
 if not Path("data/latest_report.txt").is_file():
     with open("data/latest_report.txt",'w') as f:

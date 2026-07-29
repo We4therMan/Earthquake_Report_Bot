@@ -1,19 +1,17 @@
 import discord
-from discord.ext import commands
-from datetime import datetime
 from USGSreportmaker import format_usgs_time
 
 def make_eew_embed(eew_caption,mag,area_list):
     embed = discord.Embed(
         title="Earthquake Early Warning",
-        description=eew_caption,
+        description=f'ShakeAlert has been triggered.\n{eew_caption}',
         color=discord.Colour.red(),
     )
     
     embed.add_field(name="Estimated magnitude", value=mag)
 
     formatted_list = f"- {'\n- '.join(area_list)}"
-    embed.add_field(name="Counties/Regions",value=formatted_list, inline=True)
+    embed.add_field(name="Warned counties/regions",value=formatted_list, inline=True)
 
     fname = "latest_eew.png"
     embed.set_image(url=f'attachment://{fname}')
@@ -54,10 +52,10 @@ def make_mmi_embed(
 
     return embed
 
-def make_nomap_embed(ev_time,mag,url):
+def make_nomap_embed(ev_time,desc,mag,url):
     embed = discord.Embed(
         title="USGS Earthquake Report",
-        description=f"On {ev_time}, an earthquake occurred in the region.\nNo intensity-by-city data is available for this earthquake",
+        description=f"On {ev_time},\n{desc} occurred in the region.\nThis message will be updated when more information is published by USGS.",
     )
 
     embed.add_field(name="Magnitude",value=mag, inline=True)
@@ -111,55 +109,3 @@ def make_viewevent_mmi_embed(
         embed.set_image(url=f'attachment://{fname}')
 
     return embed
-
-
-
-
-
-# class EventListView(discord.ui.View):
-#     def __init__(self, events, per_page=20):
-#         super().__init__(timeout=300)
-#         self.events = events
-#         self.per_page = per_page
-#         self.page = 0
-
-#     def make_embed(self):
-#         start = self.page * self.per_page
-#         end = start + self.per_page
-
-#         lines = [
-#             f"{idx}: {title}"
-#             for idx, title in self.events[start:end]
-#         ]
-
-#         embed = discord.Embed(
-#             title="Saved Events",
-#             description="```" + "\n".join(lines) + "```"
-#         )
-
-#         total_pages = (len(self.events) - 1) // self.per_page + 1
-#         embed.set_footer(text=f"Page {self.page + 1}/{total_pages}")
-
-#         return embed
-
-#     @discord.ui.button(label="◀ Previous", style=discord.ButtonStyle.secondary)
-#     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
-#         if self.page > 0:
-#             self.page -= 1
-#             await interaction.response.edit_message(
-#                 embed=self.make_embed(),
-#                 view=self
-#             )
-#         else:
-#             await interaction.response.defer()
-
-#     @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.secondary)
-#     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-#         if (self.page + 1) * self.per_page < len(self.events):
-#             self.page += 1
-#             await interaction.response.edit_message(
-#                 embed=self.make_embed(),
-#                 view=self
-#             )
-#         else:
-#             await interaction.response.defer()
