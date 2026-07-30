@@ -417,7 +417,7 @@ class ReportMaker:
                 epi_county = self.ca_nv.loc[county_closest]["NAME"]
                 epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
                 epi_state = name_from_fp(epi_statefp)
-                self.eew_caption = f'{desc} was detected in {epi_county} County, {epi_state}'
+                self.eew_caption = f'{desc} was detected off {epi_county} County, {epi_state}'
 
             ew_style = dict(boxstyle='square', facecolor='red', edgecolor='black')
             axi.text(0.5,0.98,'EARTHQUAKE WARNING',transform=axi.transAxes,fontsize=36,color='w',fontweight='bold',bbox=ew_style,va='top',ha='center')
@@ -433,6 +433,21 @@ class ReportMaker:
 
             axi.scatter(self.eew_epix,self.eew_epiy,marker='X',c='r',ec='white',linewidths=2,s=750,zorder=2)
             # plot_polygon(alert_poly)
+
+            # minimap
+            axins = axi.inset_axes([0.845,0.5,0.15,0.2])
+
+            axins.text(0.66,0.67,"NV",transform=axins.transAxes,fontsize=12,fontweight='bold',color='black')
+            axins.text(0.41,0.44,"CA",transform=axins.transAxes,fontsize=12,fontweight='bold',color='black')
+            state_colors = self.ca_nv['STATEFP'].map({'06': 'gainsboro', '32': 'silver'})
+            self.ca_nv.plot(ax=axins,color=state_colors,edgecolor='gray',linewidth=0.5)
+            axins.set_xticks([])
+            axins.set_yticks([])
+            rect, lines = axins.indicate_inset_zoom(axi,edgecolor='red',linewidth=1.5,alpha=1.0)
+            rect.set_clip_on(True)
+            rect.set_clip_box(axins.bbox)
+            for line in lines: 
+                line.set_visible(False)
 
             # axi.set_title(f"Example: {event['properties']['title']}, threshold {MMI}")
             fname = "data/eew_temp.png" if is_temp else "data/latest_eew.png"
@@ -525,7 +540,7 @@ class ReportMaker:
             epi_county = self.ca_nv.loc[county_closest]["NAME"]
             epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
             epi_state = name_from_fp(epi_statefp)
-            caption = f'{desc} occurred in {epi_county} County, {epi_state}'
+            caption = f'{desc} occurred off {epi_county} County, {epi_state}'
         self.mmi_report_caption = caption
 
     def make_mmi_map(self,show=False,is_temp=False):
@@ -642,6 +657,21 @@ class ReportMaker:
             axi.set_extent(map_lims)
 
             axi.scatter(epix,epiy,marker='X',c='r',ec='white',linewidths=2,s=750,zorder=2)
+
+            # minimap
+            axins = axi.inset_axes([0.845,0.5,0.15,0.2])
+
+            axins.text(0.66,0.67,"NV",transform=axins.transAxes,fontsize=12,fontweight='bold',color='black')
+            axins.text(0.41,0.44,"CA",transform=axins.transAxes,fontsize=12,fontweight='bold',color='black')
+            state_colors = self.ca_nv['STATEFP'].map({'06': 'gainsboro', '32': 'silver'})
+            self.ca_nv.plot(ax=axins,color=state_colors,edgecolor='gray',linewidth=0.5)
+            axins.set_xticks([])
+            axins.set_yticks([])
+            rect, lines = axins.indicate_inset_zoom(axi,edgecolor='red',linewidth=1.5,alpha=1.0)
+            rect.set_clip_on(True)
+            rect.set_clip_box(axins.bbox)
+            for line in lines: 
+                line.set_visible(False)
 
             fname = "data/mmi_temp.png" if is_temp else "data/latest_mmis.png"
             plt.savefig(fname,bbox_inches='tight')
