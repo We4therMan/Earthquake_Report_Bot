@@ -408,7 +408,6 @@ class ReportMaker:
                 # if epicenter is within a polygon
                 epi_county = self.ca_nv[epi_mask]['NAME'].to_list()[0]
                 epi_statefp = self.ca_nv[epi_mask]['STATEFP'].to_list()[0]
-                print(epi_statefp)
                 epi_state = name_from_fp(epi_statefp)
                 self.eew_caption = f'{desc} was detected in {epi_county} County, {epi_state}'
             else:
@@ -444,6 +443,7 @@ class ReportMaker:
             print("No EEW was issued for this event.")
 
     def get_mmi_data(self):
+
         try:
             # fetch intensity info from losspager. Usually only available for significant earthquakes
             city_mmi_url = self.ev_detail['properties']['products']['losspager'][0]['contents']['json/cities.json']['url']
@@ -509,6 +509,25 @@ class ReportMaker:
                 print("losspager and dyfi not available. Plot cannot be be made")
                 self.mmi_plottable = False
 
+        desc = self.mag_style(self.ev_mag)
+        epi_mask = self.ca_nv.contains(Point(self.ev_epix, self.ev_epiy))
+        name_from_fp = lambda fp: "CA" if fp == '06' else "NV"
+        if epi_mask.any():
+            # if epicenter is within a polygon
+            epi_county = self.ca_nv[epi_mask]['NAME'].to_list()[0]
+            epi_statefp = self.ca_nv[epi_mask]['STATEFP'].to_list()[0]
+            epi_state = name_from_fp(epi_statefp)
+            caption = f'{desc} occurred in {epi_county} County, {epi_state}'
+        else:
+            #if epicenter is off all polygons (assumes offshore)
+            # better method needed for events onshore off region (e.g. in Oregon, Utah, Mexico, etc.)
+            county_closest = self.ca_nv.distance(Point(self.ev_epix, self.ev_epiy)).sort_values().index[0]
+            epi_county = self.ca_nv.loc[county_closest]["NAME"]
+            epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
+            epi_state = name_from_fp(epi_statefp)
+            caption = f'{desc} occurred in {epi_county} County, {epi_state}'
+        self.mmi_report_caption = caption
+
     def make_mmi_map(self,show=False,is_temp=False):
         """
         show: show plot in matplotlib (for testing) [bool, default: False]
@@ -557,25 +576,25 @@ class ReportMaker:
             n='\n' # newline variable
 
             # caption = f"An earthquake occurred {event['properties']['place']}"
-            desc = self.mag_style(self.ev_mag)
-            epi_mask = self.ca_nv.contains(Point(epix,epiy))
-            name_from_fp = lambda fp: "CA" if fp == '06' else "NV"
-            if epi_mask.any():
-                # if epicenter is within a polygon
-                epi_county = self.ca_nv[epi_mask]['NAME'].to_list()[0]
-                epi_statefp = self.ca_nv[epi_mask]['STATEFP'].to_list()[0]
-                epi_state = name_from_fp(epi_statefp)
-                caption = f'{desc} occurred in {epi_county} County, {epi_state}'
-            else:
-                #if epicenter is off all polygons (assumes offshore)
-                # better method needed for events onshore off region (e.g. in Oregon, Utah, Mexico, etc.)
-                county_closest = self.ca_nv.distance(Point(epix,epiy)).sort_values().index[0]
-                epi_county = self.ca_nv.loc[county_closest]["NAME"]
-                epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
-                epi_state = name_from_fp(epi_statefp)
-                caption = f'{desc} occurred in {epi_county} County, {epi_state}'
-            self.mmi_report_caption = caption
-            report_txt = f'{self.ev_timestamp} PT\n{n.join(textwrap.wrap(caption,width=50))}'
+            # desc = self.mag_style(self.ev_mag)
+            # epi_mask = self.ca_nv.contains(Point(epix,epiy))
+            # name_from_fp = lambda fp: "CA" if fp == '06' else "NV"
+            # if epi_mask.any():
+            #     # if epicenter is within a polygon
+            #     epi_county = self.ca_nv[epi_mask]['NAME'].to_list()[0]
+            #     epi_statefp = self.ca_nv[epi_mask]['STATEFP'].to_list()[0]
+            #     epi_state = name_from_fp(epi_statefp)
+            #     caption = f'{desc} occurred in {epi_county} County, {epi_state}'
+            # else:
+            #     #if epicenter is off all polygons (assumes offshore)
+            #     # better method needed for events onshore off region (e.g. in Oregon, Utah, Mexico, etc.)
+            #     county_closest = self.ca_nv.distance(Point(epix,epiy)).sort_values().index[0]
+            #     epi_county = self.ca_nv.loc[county_closest]["NAME"]
+            #     epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
+            #     epi_state = name_from_fp(epi_statefp)
+            #     caption = f'{desc} occurred in {epi_county} County, {epi_state}'
+            # self.mmi_report_caption = caption
+            report_txt = f'{self.ev_timestamp} PT\n{n.join(textwrap.wrap(self.mmi_report_caption,width=50))}'
             psa_style = dict(boxstyle='square', facecolor='blue', edgecolor='black')
             axi.text(0.5,0.98,report_txt,transform=axi.transAxes,fontsize=20,color='yellow',bbox=psa_style,va='top',ha='center',zorder=15)
 

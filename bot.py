@@ -176,22 +176,22 @@ async def sync(ctx):
 @commands.is_owner()
 async def testmsg(ctx):
     test_nomap_embed = make_nomap_embed(
-        "July 26, 2026",
-        "A major earthquake",
-        7.2,
-        "https://earthquake.usgs.gov/earthquakes/eventpage/official19060418131226300_12/executive"
+        "THIS IS A SAMPLE REPORT.\n"+rm.ev_timestamp,
+        rm.mmi_report_caption,
+        rm.ev_mag,
+        rm.ev_url
     )
     test_mmi_embed = make_mmi_embed(
-        "A major earthquake occured off San Francisco County",
-        "https://earthquake.usgs.gov/earthquakes/eventpage/official19060418131226300_12/executive",
-        "July 26, 2026",
-        7.2,
-        "IX",
-        "Violent",
-        ["San Francisco","Oakland","Berkeley"]
+        "THIS IS A SAMPLE REPORT.\n"+rm.mmi_report_caption,
+        rm.ev_url,
+        rm.ev_timestamp,
+        rm.ev_mag,
+        rm.ev_maxnumeral,
+        rm.ev_maxdesc,
+        rm.cities_max_mmi,
     )
     test_eew_embed = make_eew_embed(
-        "A major earthquake was detected off San Francisco County",
+        "THIS IS A SAMPLE REPORT.\n"+"A major earthquake was detected off San Francisco County",
         7.5,
         ["Bay Area", "North Coast", "Sacramento Valley"]
     )
@@ -347,6 +347,7 @@ async def check_quakes():
         else:
             nomap_embed = make_nomap_embed(
                 rm.ev_timestamp,
+                rm.mmi_report_caption,
                 rm.ev_mag,
                 rm.ev_url
             )

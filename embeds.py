@@ -55,7 +55,7 @@ def make_mmi_embed(
 def make_nomap_embed(ev_time,desc,mag,url):
     embed = discord.Embed(
         title="USGS Earthquake Report",
-        description=f"On {ev_time},\n{desc} occurred in the region.\nThis message will be updated when more information is published by USGS.",
+        description=f"On {ev_time},\n{desc}.\nThis message will be updated when more information is published by USGS.",
     )
 
     embed.add_field(name="Magnitude",value=mag, inline=True)
