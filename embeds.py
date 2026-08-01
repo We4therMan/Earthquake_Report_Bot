@@ -85,21 +85,23 @@ def make_viewevent_mmi_embed(
         viewevent_mmi_caption,
         ev_time,
         url,
+        mag,
         plottable=False,
-        mag=None,
         max_mmi=None,
         mmi_desc=None,
         cities_max_mmi=None
     ):
+
     embed = discord.Embed(
         title=f"Earthquake report archive: {event_title[1]}",
         description=f"On {ev_time},\n{viewevent_mmi_caption}",
         url = url,
         color=discord.Colour.green(),
     )
-    
+
+    embed.add_field(name="Magnitude",value=mag, inline=True)
+
     if plottable:
-        embed.add_field(name="Magnitude",value=mag, inline=True)
         embed.add_field(name="Max. intensity",value=f"{max_mmi} ({mmi_desc})",inline=True)
 
         formatted_list = f"- {'\n- '.join(cities_max_mmi)}"

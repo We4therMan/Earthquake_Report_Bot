@@ -103,9 +103,14 @@ async def viewevent(interaction: discord.Interaction, index: int):
     SAlaunch = "Oct 17, 2019 12:00 AM"
     before_SA = datetime.strptime(rm_temp.ev_timestamp,tformat) < datetime.strptime(SAlaunch,tformat)
 
+    embeds = []
+    imgs = []
+
+    await status.edit(content="Loading ShakeAlert data...")
+
     rm_temp.make_eew_map(is_temp=True)
     if rm_temp.has_eew:
-        await status.edit(content="Loading ShakeAlert data...")
+
         eew_msg = (
             f"This earthquake triggered ShakeAlert.\n"
             f"{rm_temp.eew_caption}\n"
@@ -118,7 +123,8 @@ async def viewevent(interaction: discord.Interaction, index: int):
             area_list=rm_temp.formatted_warned_areas
         )
         eew_temp_img = discord.File("data/eew_temp.png",filename="eew_temp.png")
-        await interaction.followup.send(embed=temp_eew_embed,file=eew_temp_img)
+        imgs.append(eew_temp_img)
+        # await interaction.followup.send(embed=temp_eew_embed,file=eew_temp_img)
     elif before_SA:
         eew_msg = "This earthquake occurred before the launch of ShakeAlert."
         temp_eew_embed = make_viewevent_eew_embed(
@@ -126,7 +132,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
                 has_eew=False,
                 viewev_eew_caption=eew_msg
             )
-        await interaction.followup.send(embed=temp_eew_embed)
+        # await interaction.followup.send(embed=temp_eew_embed)
     else:
         eew_msg = "This earthquake did not trigger ShakeAlert."
         temp_eew_embed = make_viewevent_eew_embed(
@@ -134,9 +140,10 @@ async def viewevent(interaction: discord.Interaction, index: int):
                 has_eew=False,
                 viewev_eew_caption=eew_msg
             )
-        await interaction.followup.send(embed=temp_eew_embed)
+        # await interaction.followup.send(embed=temp_eew_embed)
+    embeds.append(temp_eew_embed)
 
-    await status.edit(content="Loading intensity data.")
+    await status.edit(content="Loading intensity data...")
     rm_temp.make_mmi_map(is_temp=True)
 
     if rm_temp.mmi_plottable:
@@ -152,19 +159,135 @@ async def viewevent(interaction: discord.Interaction, index: int):
             cities_max_mmi=rm_temp.cities_max_mmi
         )
         mmi_temp_img = discord.File("data/mmi_temp.png",filename="mmi_temp.png")
-        await interaction.followup.send(embed=temp_mmi_embed,file=mmi_temp_img)
+        embeds.append(temp_mmi_embed)
+        imgs.append(mmi_temp_img)
+        # await interaction.followup.send(embed=temp_mmi_embed,file=mmi_temp_img)
         # await interaction.followup.send(msg2,file=discord.File("data/mmi_temp.png"))
     else:
-        desc = rm_temp.mmi_report_caption + "\nNo intensity-by-city data is available for this event."
+        desc = (rm_temp.mmi_report_caption 
+        + "\n\nNo intensity-by-city data is available for this event."
+        + "\nFor more information, click the link to go to the USGS page for this earthquake.")
+
         temp_nomap = make_viewevent_mmi_embed(
             event_title=rm_temp.evlist[index],
             viewevent_mmi_caption=desc,
-            ev_time=rm.ev_timestamp,
+            ev_time=rm_temp.ev_timestamp,
             url=rm_temp.ev_url,
             plottable=False)
-        await interaction.followup.send(embed=temp_nomap)
+        embeds.append(temp_nomap)
+        # await interaction.followup.send(embed=temp_nomap)
 
-    await status.edit(content=f"Finished loading event {':\n'.join(rm.evlist[index])}!")
+    await interaction.followup.send(embeds=embeds,files=imgs)
+
+    await status.edit(content=f"Finished loading event {':\n'.join(rm_temp.evlist[index])}")
+
+
+@bot.tree.command(name="vieweventbyid",description="Show the report for an event from its USGS 'eventid'.")
+@app_commands.describe(id="USGS event ID of the event you want to see")
+async def viewevent(interaction: discord.Interaction, id: str):
+    # try:
+    #     await interaction.response.defer()
+    #     status = await interaction.followup.send(f"Loading event {':\n'.join(rm.evlist[index])}...")
+    # except IndexError:
+    #     await interaction.followup.send(f"Index out of bounds. Must be 0 to {len(rm.evlist)-1}")
+
+    query = {
+        "eventid": id,
+        "format": "geojson"
+    }
+
+    try:
+        rm_temp = ReportMaker(query=query) # new insance to avoid editing the auto-reports
+        await interaction.response.defer()
+        status = await interaction.followup.send(f"Loading event {id}...")
+    except:
+        await interaction.followup.send(f"Could not load event {id}. Please double check the ID.")
+
+    rm_temp.load_ev_detail(is_temp=True)
+    # rm_temp.get_eew_data()
+
+    # check if event happened before launch of ShakeAlert
+    tformat = "%b %d, %Y %I:%M %p"
+    SAlaunch = "Oct 17, 2019 12:00 AM"
+    before_SA = datetime.strptime(rm_temp.ev_timestamp,tformat) < datetime.strptime(SAlaunch,tformat)
+
+    embeds = []
+    imgs = []
+
+    await status.edit(content="Loading ShakeAlert data...")
+
+    rm_temp.make_eew_map(is_temp=True)
+    if rm_temp.has_eew:
+        eew_msg = (
+            f"This earthquake triggered ShakeAlert.\n"
+            f"{rm_temp.eew_caption}\n"
+        )
+        temp_eew_embed = make_viewevent_eew_embed(
+            event_title=rm_temp.data['properties']['title'],
+            has_eew=rm_temp.has_eew,
+            viewev_eew_caption=eew_msg,
+            mag=rm_temp.eew_mag,
+            area_list=rm_temp.formatted_warned_areas
+        )
+        eew_temp_img = discord.File("data/eew_temp.png",filename="eew_temp.png")
+        imgs.append(eew_temp_img)
+        # await interaction.followup.send(embed=temp_eew_embed,file=eew_temp_img)
+    elif before_SA:
+        eew_msg = "This earthquake occurred before the launch of ShakeAlert."
+        temp_eew_embed = make_viewevent_eew_embed(
+                event_title=rm_temp.data['properties']['title'],
+                has_eew=False,
+                viewev_eew_caption=eew_msg
+            )
+        # await interaction.followup.send(embed=temp_eew_embed)
+    else:
+        eew_msg = "This earthquake did not trigger ShakeAlert."
+        temp_eew_embed = make_viewevent_eew_embed(
+                event_title=rm_temp.data['properties']['title'],
+                has_eew=False,
+                viewev_eew_caption=eew_msg
+            )
+        # await interaction.followup.send(embed=temp_eew_embed)
+    embeds.append(temp_eew_embed)
+
+    await status.edit(content="Loading intensity data...")
+
+    rm_temp.make_mmi_map(is_temp=True)
+    if rm_temp.mmi_plottable:
+        temp_mmi_embed = make_viewevent_mmi_embed(
+            event_title=rm_temp.data['properties']['title'],
+            viewevent_mmi_caption=rm_temp.mmi_report_caption,
+            ev_time=rm_temp.ev_timestamp,
+            url=rm_temp.ev_url,
+            plottable=rm_temp.mmi_plottable,
+            mag=rm_temp.ev_mag,
+            max_mmi=rm_temp.ev_maxnumeral,
+            mmi_desc=rm_temp.ev_maxdesc,
+            cities_max_mmi=rm_temp.cities_max_mmi
+        )
+        mmi_temp_img = discord.File("data/mmi_temp.png",filename="mmi_temp.png")
+        embeds.append(temp_mmi_embed)
+        imgs.append(mmi_temp_img)
+        # await interaction.followup.send(embed=temp_mmi_embed,file=mmi_temp_img)
+        # await interaction.followup.send(msg2,file=discord.File("data/mmi_temp.png"))
+    else:
+        desc = (rm_temp.mmi_report_caption 
+        + "\n\nNo intensity-by-city data is available for this event."
+        + "\nFor more information, click the link to go to the USGS page for this earthquake.")
+
+        temp_nomap = make_viewevent_mmi_embed(
+            event_title=rm_temp.data['properties']['title'],
+            viewevent_mmi_caption=desc,
+            ev_time=rm_temp.ev_timestamp,
+            url=rm_temp.ev_url,
+            mag=rm_temp.ev_mag,
+            plottable=False)
+        embeds.append(temp_nomap)
+        # await interaction.followup.send(embed=temp_nomap)
+
+    await interaction.followup.send(embeds=embeds,files=imgs)
+
+    await status.edit(content=f"Finished loading event {rm_temp.ev_detail['properties']['title']}!")
 
 @bot.command()
 @commands.is_owner()

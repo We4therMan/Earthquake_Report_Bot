@@ -3,7 +3,7 @@
 import geopandas as gpd
 import io
 import requests
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from zoneinfo import ZoneInfo
 from shapely.geometry import Polygon, Point, shape, box
 from collections import Counter
@@ -48,7 +48,18 @@ class ReportMaker:
         County data can possibly be something other than .shp if geopandas
         can parse it, but I would not experiment with it.
 
-        Query request "format" must be geojson.
+        Query request "format" must be "geojson".
+
+        'query' can also be a SINGLE eventid to query any event available in the USGS API,
+        like this:
+        query = {
+            "eventid": "{the event id of the earthquake}",
+            "format": "geojson"
+        }
+        Multiple eventids in the same query are not supported.
+        Also not guaranteed to work for every earthquake (needs testing).
+        Recommend not trying events outside of California-Nevada; 
+        they might work fine but might be buggy.
         """
         # parse CA-NV counties
         try:
@@ -62,12 +73,17 @@ class ReportMaker:
             return
         
         # initialize all attributes (avoid errors for not existing)
+        self.queried_by_id = False
         self.evlist = None # indexed list of events from query
         self.ev_id = None # USGS event ID
         self.ev_lastupdate = None # time of last USGS update to event (if any)
         self.ev_url = None # link to executive USGS page for event
         self.ev_timestamp = None # formatted time string for earthquake origin
-        self.ev_detail = None 
+        self.ev_detail = None # geojson object containing event details
+        self.ev_depth = None # true depth
+        self.ev_mag = None # true magnitude
+        self.ev_epix = None # true epicenter x coord
+        self.ev_epiy = None # true epicenter y coord
         self.has_eew = False # does event have a ShakeAlert product?
         self.alert_poly = None # alert polygon (used to find alerted counties)
         self.eew_epix = None # alert epicenter x coord
@@ -75,17 +91,14 @@ class ReportMaker:
         self.eew_mag = None # estimated alert magnitude
         self.alert_colors = None # geopandas mask for alerted counties
         self.regions_used = None # were counties condensed into regions?
-        self.formatted_warned_areas = [] 
-        self.mmi_report_caption = ""
+        self.formatted_warned_areas = [] # final list of areas to be shown on eew map
+        self.mmi_report_caption = "" # final description of earthquake for mmi map
         self.city_names = []
         self.mmi_coord_pairs = []
         self.mmis = []
         self.mmi_plottable = False # is there data to map MMI?
         self.cities_max_mmi = []
         self.dyfi_used = False
-        self.ev_mag = None # true magnitude
-        self.ev_epix = None # true epicenter x coord
-        self.ev_epiy = None # true epicenter y coord
         self.ev_maxnumeral = None
         self.ev_maxdesc = None
 
@@ -101,7 +114,13 @@ class ReportMaker:
             return
         print('Fetched USGS data for query.')
 
-        self.evlist = [(str(i),feat['properties']['title']) for i, feat in enumerate(self.data['features'])]
+        if "eventid" in query:
+            # if id was used to query, handle single event json
+            self.queried_by_id = True
+            self.evlist = None
+        else:
+            # otherwise make eventlist and proceed as normal
+            self.evlist = [(str(i),feat['properties']['title']) for i, feat in enumerate(self.data['features'])]
 
     def load_ev_detail(self,index=0,is_temp=False):
         """Parses USGS API response and writes txt file with event id
@@ -109,7 +128,15 @@ class ReportMaker:
         index: select different item from list (attr evlist). Default 0 (latest event) [int]
 
         """
-        event = self.data['features'][index]
+        if self.queried_by_id:
+            event = self.data
+            self.ev_detail = self.data
+        else:
+            event = self.data['features'][index]
+            event_detail_url = event['properties']['detail']
+            r2 = requests.get(event_detail_url)
+            self.ev_detail = r2.json()
+
         ev_name = event['properties']['title']
         #save id and update timestamp to detect updates or new events
         self.ev_id = event['id']
@@ -121,19 +148,19 @@ class ReportMaker:
         with open(fname,"w") as f:
             f.write(f"{self.ev_id}\n{self.ev_lastupdate}")
 
-        ev_time = event['properties']['time']
-        # ev_utc = datetime.fromtimestamp(ev_time / 1000, UTC)
-        # ev_local = ev_utc.astimezone(ZoneInfo("America/Los_Angeles"))
-        # time_str = ev_local.strftime("%b %d, %Y %I:%M %p")
-        time_str = format_usgs_time(ev_time)
+        # get basic earthquake info
+        origin_data = self.ev_detail['properties']['products']['origin'][0]['properties']
+        self.ev_depth = float(origin_data['depth'])
+        self.ev_mag = round(float(origin_data['magnitude']),1)
+        self.ev_epix = float(origin_data['longitude'])
+        self.ev_epiy = float(origin_data['latitude'])
+
+        time_str = format_usgs_time(event['properties']['time'])
         self.ev_timestamp = time_str
-        print("Loading report:")
+
+        print("Loaded report:")
         print(ev_name)
         print(time_str)
-        event_detail_url = event['properties']['detail']
-        r2 = requests.get(event_detail_url)
-        self.ev_detail = r2.json()
-
         
     """
     format_warned_area() condenses long lists of counties if they exceed a 
@@ -465,9 +492,9 @@ class ReportMaker:
             r4 = requests.get(city_mmi_url)
             city_mmis = r4.json()
 
-            source_data = self.ev_detail['properties']['products']['losspager'][0]['properties']
-            self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
-            self.ev_mag = float(source_data['magnitude'])
+            # source_data = self.ev_detail['properties']['products']['losspager'][0]['properties']
+            # self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
+            # self.ev_mag = float(source_data['magnitude'])
             # alternative map centering on epicenter, bad for offshore earthquakes
             # x1, x2, y1, y2 = (epix - box_hl, epix + box_hl, epiy - box_hl/1.5, epiy + box_hl/1.5)
 
@@ -494,9 +521,9 @@ class ReportMaker:
             try:
                 dyfi_data = self.ev_detail['properties']['products']['dyfi'][0]
 
-                source_data = dyfi_data['properties']
-                self.ev_mag = float(source_data['magnitude'])
-                self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
+                # source_data = dyfi_data['properties']
+                # self.ev_mag = float(source_data['magnitude'])
+                # self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
 
                 r4 = requests.get(dyfi_data['contents']['cdi_zip.txt']['url'])
                 txt_zip_mmis = r4.text
@@ -790,7 +817,11 @@ class ReportMaker:
         else: print("Not sending email")
 
 def format_usgs_time(t):
-    dt = datetime.fromtimestamp(t/1000, UTC)
+    if t < 0:
+        epoch = datetime(1970,1,1,tzinfo=UTC)
+        dt = epoch + timedelta(milliseconds=t)
+    else:
+        dt = datetime.fromtimestamp(t/1000, UTC)
     pt = dt.astimezone(ZoneInfo("America/Los_Angeles"))
     timestr = pt.strftime("%b %d, %Y %I:%M %p")
     return timestr
