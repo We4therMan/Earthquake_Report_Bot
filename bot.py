@@ -388,6 +388,7 @@ async def check_quakes():
                 else:
                     nomap_update_embed = make_nomap_embed(
                         rm.ev_timestamp,
+                        rm.mmi_report_caption,
                         rm.ev_mag,
                         rm.ev_url
                     )
