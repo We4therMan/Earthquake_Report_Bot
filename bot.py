@@ -5,7 +5,7 @@ from discord.ext import commands
 from io import StringIO
 from pathlib import Path
 from config import TOKEN
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from zoneinfo import ZoneInfo
 
 from USGSreportmaker import ReportMaker, format_usgs_time
@@ -68,8 +68,6 @@ async def setchannel(
         f"Reports will now be sent in {channel.mention}",
         ephemeral=True
     )
-
-# @bot.tree.command(name="query",description="Request a new USGS query ")
 
 @bot.tree.command(name="eventlist",description="Show full saved event list.")
 async def eventlist(interaction: discord.Interaction):
@@ -430,6 +428,9 @@ async def check_quakes():
         # (note: can also be the previous event if the latest event has a magnitude downgrade)
         # make both maps and messages
         print("New event posted.")
+        if rm.ev_mag >= 5.0:
+            with open("data/notable_quakes.txt",'a') as f:
+                f.write(f"{rm.ev_id} {rm.ev_timestamp}\n")
         rm.make_eew_map()
         rm.make_mmi_map()
         msg_eew = rm.format_report_msg("eew",index)
@@ -502,6 +503,127 @@ def read_latest():
             return curr_ev_id, curr_ev_lastupdate
     except FileNotFoundError:
         return None
+
+# TODO: fix logic so that it only tries to update message if there is a new ev update
+# otherwise it'll do it every time (this may not be necessarily bad but..)
+
+# @tasks.loop(minutes=10)
+# async def update_significant_quakes():
+#     ids_to_update = get_quakes_to_update()
+
+#     for quake_id in ids_to_update:
+#         query = {
+#             "format": "geojson",
+#             "eventid": quake_id
+#         }
+#         rm_notable = ReportMaker(query=query)
+#         rm_notable.load_ev_detail()
+#         rm_notable.make_eew_map()
+#         rm_notable.make_mmi_map()
+
+#         for sent_report in select_msgs(rm_notable.ev_id):
+#             update_embeds = []
+#             update_imgs = []
+#             if rm_notable.has_eew:
+#                 eew_update_embed = make_eew_embed(
+#                     rm_notable.eew_caption,
+#                     rm_notable.eew_mag,
+#                     rm_notable.formatted_warned_areas
+#                 )
+#                 eew_update_img = discord.File("data/latest_eew.png",filename="latest_eew.png")
+#                 update_embeds.append(eew_update_embed)
+#                 update_imgs.append(eew_update_img)
+
+#             if rm_notable.mmi_plottable:
+#                 mmi_update_embed = make_mmi_embed(
+#                     rm_notable.mmi_report_caption,
+#                     rm_notable.ev_url,
+#                     rm_notable.ev_timestamp,
+#                     rm_notable.ev_mag,
+#                     rm_notable.ev_maxnumeral,
+#                     rm_notable.ev_maxdesc,
+#                     rm_notable.cities_max_mmi,
+#                     update=True,
+#                     update_time=rm_notable.ev_lastupdate
+#                     )
+#                 mmi_update_img = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
+#                 update_embeds.append(mmi_update_embed)
+#                 update_imgs.append(mmi_update_img)
+#             # if event still doesn't have mmi data after this update
+#             else:
+#                 nomap_update_embed = make_nomap_embed(
+#                     rm_notable.ev_timestamp,
+#                     rm_notable.mmi_report_caption,
+#                     rm_notable.ev_mag,
+#                     rm_notable.ev_url
+#                 )
+#                 update_embeds.append(nomap_update_embed)
+
+#             guild_id, channel_id, msg_id = sent_report
+#             print(f"Fetching msg {msg_id}")
+#             # get channel id from bot chache
+#             channel = bot.get_channel(channel_id)
+#             # find through api if not available
+#             if not channel:
+#                 try:
+#                     channel = await bot.fetch_channel(channel_id)
+#                 except discord.NotFound:
+#                     print(f"Channel {channel} in guild {guild_id} not found.")
+#                     continue
+#                 except discord.Forbidden:
+#                     print(f"Bot does not have permission to access {channel} in guild {guild_id}.")
+#                     continue
+
+#             # fetch original report msg
+#             if channel:
+#                 try:
+#                     msg_to_edit = await channel.fetch_message(msg_id)
+#                 except:
+#                     print(f"Original report message in {channel_id} not found. It may have been deleted.")
+#                     continue
+#             # edit message
+#             try:
+#                 await msg_to_edit.edit(embeds=update_embeds,attachments=update_imgs)
+#                 print(f'msg sent')
+#             except discord.Forbidden:
+#                 print(f"No permissions to edit message in {channel_id}")
+#                 continue
+    
+
+def get_quakes_to_update():
+    """ Updates list of notable quake reports to update.
+
+    Assumes that data/notable_quakes.txt is written during check_quakes.
+
+    - Fetches ID and earthquake timestamp
+    - Checks time since earthquake
+    - If less than 5 days since, query earthquake and update message
+    - If more than 5 days since, remove from list and stop updating
+    (Generally, most USGS DYFI responses are in by about 5 days for M>5.0 quakes)
+    
+    Returns:
+    - quakes_to_update (list): list of quake IDs to update.
+    """
+    quakes_to_update = []
+    # current time
+    timestamp_now = int(datetime.now().timestamp() * 1000)
+    deadline = timedelta(days=5)
+
+    # read in lines
+    with open("data/notable_quakes.txt","r") as f:
+        lines = f.readlines()
+
+    # only write lines that are not to be deleted
+    with open("data/notable_quakes.txt","w") as f:
+        for line in lines:
+            quake_id, quake_timestamp = line.split()
+            time_since_quake = timedelta(milliseconds=(timestamp_now-int(quake_timestamp)))
+            if time_since_quake < deadline:
+                # if timestamp is less than 5 days ago, write. Otherwise ignore and stop updating
+                quakes_to_update.append(quake_id)
+                f.write(line)
+
+    return quakes_to_update
     
 # on file run, create data files if they don't exist (others are safe)
 if not Path("data/guild_settings.db").is_file():
