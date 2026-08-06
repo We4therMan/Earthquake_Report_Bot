@@ -84,7 +84,7 @@ class ReportMaker:
         self.ev_mag = None # true magnitude
         self.ev_epix = None # true epicenter x coord
         self.ev_epiy = None # true epicenter y coord
-        self.has_eew = False # does event have a ShakeAlert product?
+        self.has_eew = None # does event have a ShakeAlert product?
         self.alert_poly = None # alert polygon (used to find alerted counties)
         self.eew_epix = None # alert epicenter x coord
         self.eew_epiy = None # alert epicenter y coord
@@ -96,7 +96,7 @@ class ReportMaker:
         self.city_names = []
         self.mmi_coord_pairs = []
         self.mmis = []
-        self.mmi_plottable = False # is there data to map MMI?
+        self.mmi_plottable = None # is there data to map MMI?
         self.cities_max_mmi = []
         self.dyfi_used = False
         self.ev_maxnumeral = None
@@ -547,7 +547,7 @@ class ReportMaker:
 
                 if names: self.mmi_plottable = True
             except:
-                self.ev_mag = self.ev_detail['properties']['mag']
+                # self.ev_mag = self.ev_detail['properties']['mag']
                 print("losspager and dyfi not available. Plot cannot be be made")
                 self.mmi_plottable = False
 

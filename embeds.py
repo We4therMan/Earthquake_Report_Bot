@@ -1,5 +1,5 @@
 import discord
-from USGSreportmaker import format_usgs_time
+from USGSreportmaker import ReportMaker, format_usgs_time
 
 def make_eew_embed(eew_caption,mag,area_list):
     embed = discord.Embed(
@@ -55,7 +55,7 @@ def make_mmi_embed(
 def make_nomap_embed(ev_time,desc,mag,url):
     embed = discord.Embed(
         title="USGS Earthquake Report",
-        description=f"On {ev_time},\n{desc}.\nThis message will be updated when more information is published by USGS.",
+        description=f"On {ev_time},\n{desc}.\nThis message will be updated if intensity information becomes available.",
     )
 
     embed.add_field(name="Magnitude",value=mag, inline=True)
