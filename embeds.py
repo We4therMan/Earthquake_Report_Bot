@@ -31,7 +31,7 @@ def make_mmi_embed(
     ):
     embed = discord.Embed(
         title="USGS Earthquake Report (Updated)" if update else "USGS Earthquake Report",
-        description=f"{mmi_caption}\nIf you felt this earthquake, fill out a [felt report]({url+"/tellus"}).",
+        description=f"{mmi_caption}.\n\nIf you felt this earthquake, fill out a [felt report]({url+"/tellus"}).",
         url = url,
         color=discord.Colour.green(),
     )

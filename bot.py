@@ -296,24 +296,26 @@ async def sync(ctx):
 @commands.is_owner()
 async def testmsg(ctx):
     test_nomap_embed = make_nomap_embed(
-        "THIS IS A SAMPLE REPORT.\n"+rm.ev_timestamp,
-        rm.mmi_report_caption,
-        rm.ev_mag,
+        "This is a link to the earthquake page on USGS",
+        "This is a descrption of the earthquake",
+        "Magnitude will be here",
         rm.ev_url
     )
     test_mmi_embed = make_mmi_embed(
-        "THIS IS A SAMPLE REPORT.\n"+rm.mmi_report_caption,
+        "This is a link to the earthquake page on USGS",
         rm.ev_url,
-        rm.ev_timestamp,
-        rm.ev_mag,
-        rm.ev_maxnumeral,
-        rm.ev_maxdesc,
-        rm.cities_max_mmi,
+        "This is the time of the earthquake",
+        "This is the magnitude of the earthquake",
+        "This is the maximum intensity reported for this earthquake",
+        "",
+        ["These are the cities","where the maximum intensity","was reported"],
     )
     test_eew_embed = make_eew_embed(
-        "THIS IS A SAMPLE REPORT.\n"+"A major earthquake was detected off San Francisco County",
-        7.5,
-        ["Bay Area", "North Coast", "Sacramento Valley"]
+        "This is an earthquake early warning report",
+        "This is the _estimated_ magnitude of the earthquake. \
+        Magnitude calculations for EEW are not official until reviewed by USGS, \
+        since they are calculated and reported at extreme speed.",
+        ["These are the areas", "where the warning was sent", "if the earthquake exceeded","the alert thresholds"]
     )
     embeds = [test_nomap_embed,test_eew_embed,test_mmi_embed]
     imgs = [
