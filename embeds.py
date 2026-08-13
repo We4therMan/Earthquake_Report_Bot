@@ -31,7 +31,7 @@ def make_mmi_embed(
     ):
     embed = discord.Embed(
         title="USGS Earthquake Report (Updated)" if update else "USGS Earthquake Report",
-        description=mmi_caption,
+        description=f"{mmi_caption}\nIf you felt this earthquake, fill out a [felt report]({url+"/tellus"}).",
         url = url,
         color=discord.Colour.green(),
     )
@@ -42,6 +42,7 @@ def make_mmi_embed(
 
     formatted_list = f"- {'\n- '.join(cities_max_mmi)}"
     embed.add_field(name="Maximum intensity in:",value=formatted_list,inline=False)
+
 
     fname = "latest_mmis.png"
     embed.set_image(url=f'attachment://{fname}')
