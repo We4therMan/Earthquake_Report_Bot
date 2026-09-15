@@ -30,7 +30,7 @@ def make_mmi_embed(
         update_time=None
     ):
     embed = discord.Embed(
-        title="USGS Earthquake Report (Updated)" if update else "USGS Earthquake Report",
+        title="USGS Earthquake Report",
         description=f"{mmi_caption}.\n\nIf you felt this earthquake, fill out a [felt report]({url+"/tellus"}).",
         url = url,
         color=discord.Colour.green(),
@@ -53,14 +53,21 @@ def make_mmi_embed(
 
     return embed
 
-def make_nomap_embed(ev_time,desc,mag,url):
+def make_nomap_embed(ev_time,desc,mag,url,update=False,update_time=None):
     embed = discord.Embed(
         title="USGS Earthquake Report",
-        description=f"On {ev_time},\n{desc}.\nThis message will be updated if intensity information becomes available.",
+        description=f"On {ev_time},\n{desc}.\n\nNo intensity reports have been published by USGS yet.\nIf you felt this earthquake, fill out a [felt report]({url+"/tellus"}).",
+        url = url
     )
 
     embed.add_field(name="Magnitude",value=mag, inline=True)
-    embed.add_field(name="Additional info",value=url)
+
+    fname = "latest_mmis.png"
+    embed.set_image(url=f'attachment://{fname}')
+
+    if update:
+        t = format_usgs_time(update_time)
+        embed.set_footer(text=f"Last updated {t}")
 
     return embed
 

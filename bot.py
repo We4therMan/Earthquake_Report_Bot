@@ -170,7 +170,9 @@ async def viewevent(interaction: discord.Interaction, index: int):
             viewevent_mmi_caption=desc,
             ev_time=rm_temp.ev_timestamp,
             url=rm_temp.ev_url,
-            plottable=False)
+            mag=rm_temp.ev_mag,
+            plottable=False,
+            )
         embeds.append(temp_nomap)
         # await interaction.followup.send(embed=temp_nomap)
 
@@ -590,9 +592,13 @@ def make_embeds_from_reportmaker(
             rm.ev_timestamp,
             rm.mmi_report_caption,
             rm.ev_mag,
-            rm.ev_url
+            rm.ev_url,
+            update=is_update,
+            update_time=update_timestamp
         )
+        mmi_map = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
         embeds.append(nomap_embed)
+        imgs.append(mmi_map)
 
     return embeds, imgs
 

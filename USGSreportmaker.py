@@ -446,11 +446,21 @@ class ReportMaker:
                 epi_state = name_from_fp(epi_statefp)
                 self.eew_caption = f'{desc} was detected off {epi_county} County, {epi_state}'
 
-            ew_style = dict(boxstyle='square', facecolor='red', edgecolor='black')
-            axi.text(0.5,0.98,'EARTHQUAKE WARNING',transform=axi.transAxes,fontsize=36,color='w',fontweight='bold',bbox=ew_style,va='top',ha='center')
-
-            psa_text = "Drop, cover, hold on.\nShaking expected in the following counties:"
-            if self.regions_used: psa_text = "Drop, cover, hold on.\nShaking expected in the following regions/counties:"
+            if self.eew_mag >= 4.5:
+                big_text_facecolor = 'red'
+                big_text_color = 'white'
+                big_text = "EARTHQUAKE WARNING"
+            else:
+                big_text_facecolor = 'yellow'
+                big_text_color = 'black'
+                big_text = "Earthquake Advisory"
+            ew_style = dict(boxstyle='square', facecolor=big_text_facecolor, edgecolor='black')
+            axi.text(0.5,0.98,big_text,transform=axi.transAxes,fontsize=36,color=big_text_color,fontweight='bold',bbox=ew_style,va='top',ha='center')
+            
+            if self.regions_used: 
+                psa_text = "Drop, cover, hold on.\nShaking expected in the following regions/counties:"
+            else:
+                psa_text = "Drop, cover, hold on.\nShaking expected in the following counties:"
             psa_style = dict(boxstyle='square', facecolor='blue', edgecolor='black')
             axi.text(0.5,0.91,psa_text,transform=axi.transAxes,fontsize=16,color='yellow',bbox=psa_style,va='top',ha='center')
 
@@ -485,7 +495,6 @@ class ReportMaker:
             print("No EEW was issued for this event.")
 
     def get_mmi_data(self):
-
         try:
             # fetch intensity info from losspager. Usually only available for significant earthquakes
             city_mmi_url = self.ev_detail['properties']['products']['losspager'][0]['contents']['json/cities.json']['url']
@@ -705,6 +714,55 @@ class ReportMaker:
             if show: plt.show()
             else: plt.close()
 
+        elif not self.mmi_plottable:
+            # if no dyfi, just plot epicenter on map
+            fig, axi = plt.subplots(1,1,figsize=(15,15), subplot_kw={'projection': ccrs.PlateCarree()})
+
+            axi.add_feature(cfeature.LAND, edgecolor='black')
+            axi.add_feature(cfeature.LAKES, edgecolor='black')
+            axi.add_feature(cfeature.RIVERS)
+            axi.add_feature(cfeature.STATES)
+            axi.add_feature(cfeature.OCEAN)
+            self.ca_nv.plot(ax=axi,color='lightgray',edgecolor='black',linewidth=0.5)
+
+            box_hl = self.ev_mag # let box be a little bigger for this map since it's more about identifying location
+            epix, epiy = self.ev_epix, self.ev_epiy
+            x1, x2, y1, y2 = epix - box_hl, epix + box_hl, epiy - box_hl/1.25, epiy + box_hl/1.25
+            map_lims = (x1, x2, y1, y2)
+            axi.set_extent(map_lims)
+
+            report_style = dict(boxstyle='square', facecolor='blue', edgecolor='black')
+            n='\n' # newline variable
+
+            axi.text(0.5,0.05,f"Magnitude {self.ev_mag}",transform=axi.transAxes,fontsize=24,color='yellow',fontweight='bold',bbox=report_style,va='bottom',ha='center',zorder=15)
+
+            axi.scatter(epix,epiy,marker='X',c='r',ec='white',linewidths=2,s=750,zorder=2)
+
+            report_txt = f'{self.ev_timestamp} PT\n{n.join(textwrap.wrap(self.mmi_report_caption,width=50))}'
+            psa_style = dict(boxstyle='square', facecolor='blue', edgecolor='black')
+            axi.text(0.5,0.98,report_txt,transform=axi.transAxes,fontsize=20,color='yellow',bbox=psa_style,va='top',ha='center',zorder=15)
+
+            # minimap
+            axins = axi.inset_axes([0.845,0.5,0.15,0.2])
+
+            axins.text(0.66,0.67,"NV",transform=axins.transAxes,fontsize=12,fontweight='bold',color='black')
+            axins.text(0.41,0.44,"CA",transform=axins.transAxes,fontsize=12,fontweight='bold',color='black')
+            state_colors = self.ca_nv['STATEFP'].map({'06': 'gainsboro', '32': 'silver'})
+            self.ca_nv.plot(ax=axins,color=state_colors,edgecolor='gray',linewidth=0.5)
+            axins.set_xticks([])
+            axins.set_yticks([])
+            rect, lines = axins.indicate_inset_zoom(axi,edgecolor='red',linewidth=1.5,alpha=1.0)
+            rect.set_clip_on(True)
+            rect.set_clip_box(axins.bbox)
+            for line in lines: 
+                line.set_visible(False)
+
+            fname = "data/mmi_temp.png" if is_temp else "data/latest_mmis.png"
+            plt.savefig(fname,bbox_inches='tight')
+            if show: plt.show()
+            else: plt.close()
+
+
     def format_report_msg(self,report_type,test=False):
         """Generates the report message for the bot to send.
 
@@ -767,7 +825,6 @@ class ReportMaker:
             return msg
 
 
-  
     def email_mmi_report(self):
         # approve = input("This will send an email. Type 'y' to approve:")
         approve = 'y'
