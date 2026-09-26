@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, UTC
 from zoneinfo import ZoneInfo
 from shapely.geometry import Polygon, Point, shape, box
 from collections import Counter
+from adjustText import adjust_text
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -25,7 +26,7 @@ warnings.filterwarnings('ignore')
 class ReportMaker:
     """Class holding methods for creating earthquake report maps and captions for EarthquakeBot."""
 
-    default_county_file = './cb_2018_us_county_20m/cb_2018_us_county_20m.shp'
+    default_county_file = 'cb_2018_us_county_20m/cb_2018_us_county_20m.shp'
     # defines lims of a CA-NV with some space offshore for MTJ earthquakes
     lims = [-127.376, -112.412, 31.166, 42.656]
     default_query = {
@@ -71,7 +72,14 @@ class ReportMaker:
             self.ca_nv = None
             print("Could not read county data. Please check your path or file format (recommend .shp)")
             return
-        
+
+        # parse cities
+        try:
+            self.canv_cities = pd.read_csv("canvcities.csv")
+        except:
+            self.canv_cities = None
+            print("Could not read city data. Check file exists.")
+
         # initialize all attributes (avoid errors for not existing)
         self.queried_by_id = False
         self.evlist = None # indexed list of events from query
@@ -486,6 +494,42 @@ class ReportMaker:
             for line in lines: 
                 line.set_visible(False)
 
+            cities_added = 0
+            city_labels = []
+            x_to_avoid = []
+            y_to_avoid = []
+            for city in self.canv_cities.iterrows():
+                clon, clat = city[1]["lng"], city[1]["lat"]
+                if (clon < x1 or clon > x2) \
+                    or (clat < y1 or clat > y2) \
+                    or (city[1]["county_name"] not in self.ca_nv[self.ca_nv['warned']==True]["NAME"].tolist()):
+                    # if out of bounds or not in a warned county, don't use
+                    continue
+
+                cname = city[1]["city"]
+                print(cname)
+
+                cmarker, = axi.plot(clon,clat,".",c="k",markersize=8,zorder=14)
+                clabel = axi.text(clon,clat,cname,c='k',fontsize=15,ha='center',zorder=14)
+
+                city_labels.append(clabel)
+                x_to_avoid.append(clon)
+                y_to_avoid.append(clat)
+                cities_added += 1
+
+                if cities_added == 5:
+                    # max 10 cities. Stop adding and move on.
+                    break
+
+            x_to_avoid.append(self.eew_epix)
+            y_to_avoid.append(self.eew_epiy)
+
+            adjust_text(city_labels,
+                        x=x_to_avoid,
+                        y=y_to_avoid,
+                        force_static=15,
+                        arrowprops=dict(arrowstyle='-',color='k',lw=0.5))
+
             # axi.set_title(f"Example: {event['properties']['title']}, threshold {MMI}")
             fname = "data/eew_temp.png" if is_temp else "data/latest_eew.png"
             plt.savefig(fname,bbox_inches='tight')
@@ -669,9 +713,9 @@ class ReportMaker:
                     continue
                 mmi = mmis[i]
                 box_color, txt_color, fnt_weight, fnt_size, numeral, _ = self.mmi_style(mmi)
-                mmi_bbox = dict(boxstyle='circle', facecolor=box_color, edgecolor='black')
+                mmi_bbox = dict(boxstyle='circle', facecolor=box_color, edgecolor='black', alpha=0.5)
                 axi.text(
-                    x,y,numeral,
+                    x,y," ",
                     bbox=mmi_bbox,
                     c=txt_color,
                     zorder=mmi+1,
@@ -689,6 +733,32 @@ class ReportMaker:
             #         c='gray',
             #         fontsize=6
             #     )
+            cities_added = 0
+            city_labels = []
+            x_to_avoid = []
+            y_to_avoid = []
+            for city in self.canv_cities.iterrows():
+                clon, clat = city[1]["lng"], city[1]["lat"]
+                # shrink city lookup area to a box smaller to keep too many cities off to the sides from being used
+                sh_x, sh_y = box_hl/2.75, box_hl/3.75
+                if (clon < x1+sh_x or clon > x2-sh_x) or (clat < y1+sh_y or clat > y2-sh_y):
+                    # if out of map, don't use
+                    continue
+        
+                cname = city[1]["city"]
+                print(cname)
+        
+                cmarker, = axi.plot(clon,clat,".",c="k",markersize=8,zorder=14)
+                clabel = axi.text(clon,clat,cname,c='k',fontsize=15,ha='center',zorder=14)
+        
+                city_labels.append(clabel)
+                x_to_avoid.append(clon)
+                y_to_avoid.append(clat)
+                cities_added += 1
+        
+                if cities_added == 10:
+                    # max 10 cities. Stop adding and move on.
+                    break
 
             axi.set_extent(map_lims)
 
@@ -708,6 +778,12 @@ class ReportMaker:
             rect.set_clip_box(axins.bbox)
             for line in lines: 
                 line.set_visible(False)
+
+            adjust_text(city_labels,
+                        x=x_to_avoid,
+                        y=y_to_avoid,
+                        force_static=15,
+                        arrowprops=dict(arrowstyle='-',color='k',lw=0.5))
 
             fname = "data/mmi_temp.png" if is_temp else "data/latest_mmis.png"
             plt.savefig(fname,bbox_inches='tight')
