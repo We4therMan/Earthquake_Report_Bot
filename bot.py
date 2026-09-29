@@ -474,7 +474,7 @@ async def update_significant_quakes():
         rm_significant.load_ev_detail()
         if lastup_time == rm_significant.ev_lastupdate:
             # if no update, do nothing
-            print("Event has not been updated.")
+            print("Significant event has not been updated.")
             continue
         rm_significant.make_eew_map()
         rm_significant.make_mmi_map()
@@ -487,7 +487,7 @@ async def update_significant_quakes():
             )
 
             guild_id, channel_id, msg_id = sent_report
-            print(f"Fetching msg {msg_id}")
+            print(f"Significant quakes: Fetching msg {msg_id}")
             # get channel id from bot chache
             channel = bot.get_channel(channel_id)
             # find through api if not available
