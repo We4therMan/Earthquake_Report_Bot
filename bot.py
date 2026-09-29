@@ -8,17 +8,28 @@ from config import TOKEN
 from datetime import datetime, timedelta, UTC
 from zoneinfo import ZoneInfo
 
-from USGSreportmaker import ReportMaker, format_usgs_time
-from manage_guilds import init_guild_table, set_channel, get_channel
-from manage_reports import (make_table, 
-                            store_msg, 
-                            select_msgs)
-from embeds import (make_eew_embed, 
-                    make_mmi_embed, 
-                    make_nomap_embed, 
-                    make_viewevent_eew_embed, 
-                    make_viewevent_mmi_embed)
-
+from USGSreportmaker import ReportMaker
+from guilds import (
+    init_guild_table, 
+    set_channel, 
+    get_channel
+    )
+from reports import (
+    make_table, 
+    store_msg, 
+    select_msgs
+    )
+from embeds import (
+    make_eew_embed, 
+    make_mmi_embed, 
+    make_nomap_embed, 
+    make_viewevent_eew_embed, 
+    make_viewevent_mmi_embed
+    )
+from significant_quakes import (
+    manage_significant_quakes,
+    get_quakes_to_update
+    )
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -48,7 +59,9 @@ async def on_ready():
         except discord.Forbidden:
             print(f"No permission to write in {guild.name}. Removing to avoid errors. Use /setchannel to reset.")
             set_channel(guild.id, 0)
+
     check_quakes.start()
+    update_significant_quakes.start()
 
 @bot.event
 async def on_guild_join(guild):
@@ -329,6 +342,7 @@ async def testmsg(ctx):
 
 @tasks.loop(minutes=1)
 async def check_quakes():
+    print("-----Checking latest quake-----")
     # get bot's current event
     curr_ev_id, curr_ev_lastupdate = read_latest()
 
@@ -355,6 +369,10 @@ async def check_quakes():
             print("Latest event updated.")
             rm.make_eew_map()
             rm.make_mmi_map()
+
+            # sometimes an earthquake update might have it meet a sig threshold, handle here
+            if rm.is_significant:
+                manage_significant_quakes(rm)
 
             # edit all existing reports
             for sent_report in select_msgs(rm.ev_id):
@@ -395,20 +413,20 @@ async def check_quakes():
                     continue
             # finish function after loop is done
             return
+    # --------------- IF NEW EVENT -----------------------
     else:
-        # it's a new event 
         # (note: can also be the previous event if the latest event has a magnitude downgrade)
         # make both maps and messages
         print("New event posted.")
-        if rm.ev_mag >= 5.0:
-            with open("data/notable_quakes.txt",'a') as f:
-                f.write(f"{rm.ev_id} {rm.ev_timestamp} {rm.ev_lastupdate}\n")
         rm.make_eew_map()
         rm.make_mmi_map()
+
+        if rm.is_significant:
+            manage_significant_quakes(rm)
+
         msg_eew = rm.format_report_msg("eew",index)
         msg_mmi = rm.format_report_msg("mmi",index)
 
-    # ---------------------------- FOR NEW EVENTS -----------------------------
     print("Broadcasting messages")
     for guild in bot.guilds:
         embeds, imgs = make_embeds_from_reportmaker(rm)
@@ -439,32 +457,33 @@ def read_latest():
     except FileNotFoundError:
         return None
 
-# TODO: fix logic so that it only tries to update message if there is a new ev update
-# otherwise it'll do it every time (this may not be necessarily bad but save resources)
-
-@tasks.loop(minutes=10)
+@tasks.loop(minutes=15)
 async def update_significant_quakes():
-    print("Checking for notable quakes to update.")
+    print("------Checking for significant quakes to update-------")
     quakes_to_check, last_update_times = get_quakes_to_update()
+    if not quakes_to_check:
+        print("No significant quakes to update.")
+        return
 
     for quake_id, lastup_time in zip(quakes_to_check, last_update_times):
         query = {
             "format": "geojson",
             "eventid": quake_id
         }
-        rm_notable = ReportMaker(query=query)
-        rm_notable.load_ev_detail()
-        if lastup_time == rm_notable.ev_lastupdate:
+        rm_significant = ReportMaker(query=query)
+        rm_significant.load_ev_detail()
+        if lastup_time == rm_significant.ev_lastupdate:
             # if no update, do nothing
+            print("Event has not been updated.")
             continue
-        rm_notable.make_eew_map()
-        rm_notable.make_mmi_map()
+        rm_significant.make_eew_map()
+        rm_significant.make_mmi_map()
 
-        for sent_report in select_msgs(rm_notable.ev_id):
+        for sent_report in select_msgs(rm_significant.ev_id):
             update_embeds, update_imgs = make_embeds_from_reportmaker(
-                rm_notable,
+                rm_significant,
                 is_update=True,
-                update_timestamp=rm_notable.ev_lastupdate
+                update_timestamp=rm_significant.ev_lastupdate
             )
 
             guild_id, channel_id, msg_id = sent_report
@@ -496,44 +515,6 @@ async def update_significant_quakes():
             except discord.Forbidden:
                 print(f"No permissions to edit message in {channel_id}")
                 continue
-
-def get_quakes_to_update():
-    """ Updates list of notable quake reports to update.
-
-    Assumes that data/notable_quakes.txt is written during check_quakes.
-
-    - Fetches ID and earthquake timestamp
-    - Checks time since earthquake
-    - If less than 5 days since, query earthquake and update message
-    - If more than 5 days since, remove from list and stop updating
-    (Generally, most USGS DYFI responses are in by about 5 days for M>5.0 quakes)
-    
-    Returns:
-    - valid_quakes: list of quake IDs to update [list: [str,...]]
-    - quake_last_updates: list of USGS update times for the earthquakes [list: [int,...]]
-    """
-    valid_quakes = []
-    quake_last_updates = []
-    # current time
-    timestamp_now = int(datetime.now().timestamp() * 1000)
-    deadline = timedelta(days=5)
-
-    # read in lines
-    with open("data/notable_quakes.txt","r") as f:
-        lines = f.readlines()
-
-    # only write lines that are not to be deleted
-    with open("data/notable_quakes.txt","w") as f:
-        for line in lines:
-            quake_id, quake_timestamp, update_timestamp = line.split()
-            time_since_quake = timedelta(milliseconds=(timestamp_now-int(quake_timestamp)))
-            if time_since_quake < deadline:
-                # if timestamp is less than 5 days ago, write. Otherwise ignore and stop updating
-                valid_quakes.append(quake_id)
-                quake_last_updates.append(int(update_timestamp))
-                f.write(line)
-        
-    return valid_quakes, quake_last_updates
 
 def make_embeds_from_reportmaker(
         rm: ReportMaker, 
@@ -614,6 +595,10 @@ if not Path("data/messages.db").is_file():
 if not Path("data/latest_report.txt").is_file():
     with open("data/latest_report.txt",'w') as f:
         f.write("[id]\n10000000")
+
+if not Path("data/significant_quakes.txt").is_file():
+    with open("data/significant_quakes.txt","a") as f:
+        pass
 
 # run bot
 bot.run(TOKEN)

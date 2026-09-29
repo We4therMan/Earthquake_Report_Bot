@@ -31,7 +31,7 @@ class ReportMaker:
     lims = [-127.376, -112.412, 31.166, 42.656]
     default_query = {
         "format": "geojson",
-        "starttime": '2015-01-01',
+        "starttime": '2026-01-01',
         "minmagnitude": '3.0',
         "minlongitude": lims[0],
         "maxlongitude": lims[1],
@@ -86,10 +86,12 @@ class ReportMaker:
         self.ev_id = None # USGS event ID
         self.ev_lastupdate = None # time of last USGS update to event (if any)
         self.ev_url = None # link to executive USGS page for event
+        self.ev_epoch = None # raw epoch time of event
         self.ev_timestamp = None # formatted time string for earthquake origin
         self.ev_detail = None # geojson object containing event details
         self.ev_depth = None # true depth
         self.ev_mag = None # true magnitude
+        self.is_significant = False # tag for significant earthquakes for extended updates
         self.ev_epix = None # true epicenter x coord
         self.ev_epiy = None # true epicenter y coord
         self.has_eew = None # does event have a ShakeAlert product?
@@ -160,10 +162,14 @@ class ReportMaker:
         origin_data = self.ev_detail['properties']['products']['origin'][0]['properties']
         self.ev_depth = float(origin_data['depth'])
         self.ev_mag = round(float(origin_data['magnitude']),1)
+        if self.ev_mag >= 4.5:
+            self.is_significant = True
+            print("This event has been labeled significant for crossing the M4.5 threshold.")
         self.ev_epix = float(origin_data['longitude'])
         self.ev_epiy = float(origin_data['latitude'])
 
-        time_str = format_usgs_time(event['properties']['time'])
+        self.ev_epoch = event['properties']['time']
+        time_str = format_usgs_time(self.ev_epoch)
         self.ev_timestamp = time_str
 
         print("Loaded report:")
@@ -507,8 +513,6 @@ class ReportMaker:
                     continue
 
                 cname = city[1]["city"]
-                print(cname)
-
                 cmarker, = axi.plot(clon,clat,".",c="k",markersize=8,zorder=14)
                 clabel = axi.text(clon,clat,cname,c='k',fontsize=15,ha='center',zorder=14)
 
@@ -564,6 +568,9 @@ class ReportMaker:
             self.mmis = mmis
 
             self.dyfi_used = False
+            # losspager earthquakes are implicitly significant
+            self.is_significant = True
+            print("This event has been labeled significant due to having a losspager product.")
 
             if names: self.mmi_plottable = True
             # end of losspager data. Below here use dyfi if not available.
@@ -573,7 +580,10 @@ class ReportMaker:
             print("No losspager. Using dyfi txt")
             try:
                 dyfi_data = self.ev_detail['properties']['products']['dyfi'][0]
-
+                num_resp = int(dyfi_data['properties']['num-responses'])
+                if num_resp >= 250:
+                    self.is_significant = True
+                    print("This event has been labeled significant due to having a high number of DYFI reports.")
                 # source_data = dyfi_data['properties']
                 # self.ev_mag = float(source_data['magnitude'])
                 # self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
@@ -746,8 +756,6 @@ class ReportMaker:
                     continue
         
                 cname = city[1]["city"]
-                print(cname)
-        
                 cmarker, = axi.plot(clon,clat,".",c="k",markersize=8,zorder=14)
                 clabel = axi.text(clon,clat,cname,c='k',fontsize=15,ha='center',zorder=14)
         
