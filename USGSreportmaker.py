@@ -154,9 +154,9 @@ class ReportMaker:
         self.ev_url = event['properties']['url']
 
         # write txt
-        fname = "data/temp_report.txt" if is_temp else "data/latest_report.txt"
-        with open(fname,"w") as f:
-            f.write(f"{self.ev_id}\n{self.ev_lastupdate}")
+        # fname = "data/temp_report.txt" if is_temp else "data/latest_report.txt"
+        # with open(fname,"w") as f:
+        #     f.write(f"{self.ev_id}\n{self.ev_lastupdate}")
 
         # get basic earthquake info
         origin_data = self.ev_detail['properties']['products']['origin'][0]['properties']
@@ -847,115 +847,66 @@ class ReportMaker:
             else: plt.close()
 
 
-    def format_report_msg(self,report_type,test=False):
-        """Generates the report message for the bot to send.
+    # def format_report_msg(self,report_type,test=False):
+    #     """Generates the report message for the bot to send.
 
-        report_type: the type of report to output. Options:
-        "eew", "mmi", "update". [str]
-        test: should be True during testing (i.e. index of report is not 0) [bool, default: False]
+    #     report_type: the type of report to output. Options:
+    #     "eew", "mmi", "update". [str]
+    #     test: should be True during testing (i.e. index of report is not 0) [bool, default: False]
 
-        returns 'msg' [str]
+    #     returns 'msg' [str]
 
-        In bot.py 'check_quakes()', 'test' can take 'index' [int] as argument since 
-        by design it is falsy when the bot is not being tested.
-        """
+    #     In bot.py 'check_quakes()', 'test' can take 'index' [int] as argument since 
+    #     by design it is falsy when the bot is not being tested.
+    #     """
 
-        if report_type == "eew":
-            msg = (
-                f"_A new ShakeAlert product has been published by the USGS._\n\n"
-                f"A recent earthquake has triggered the ShakeAlert system.\n"
-                f"An alert was sent to the following regions/counties:\n"
-                f"- {"\n- ".join(self.formatted_warned_areas)}\n"
-                f"If you receive an earthquake alert\n"
-                f"**drop, cover, and hold on.**"
-            )
+    #     if report_type == "eew":
+    #         msg = (
+    #             f"_A new ShakeAlert product has been published by the USGS._\n\n"
+    #             f"A recent earthquake has triggered the ShakeAlert system.\n"
+    #             f"An alert was sent to the following regions/counties:\n"
+    #             f"- {"\n- ".join(self.formatted_warned_areas)}\n"
+    #             f"If you receive an earthquake alert\n"
+    #             f"**drop, cover, and hold on.**"
+    #         )
         
-        elif report_type == "mmi":
-            msg = (f"_A new earthquake report has been published by the USGS._\n\n"
-                f"**{self.ev_timestamp}**\n"
-                f"**{self.mmi_report_caption}**\n"
-                f"Magnitude: {self.ev_mag}\n"
-                f"Maximum intensity: {self.ev_maxnumeral} ({self.ev_maxdesc})\n"
-                f"Maximum intensity felt in the following cities:\n"
-                f"- {"\n- ".join(self.cities_max_mmi)}\n\n"
-                f"If you felt this earthquake, visit {self.ev_url+"/tellus"}"
-                f" to fill out a Did You Feel It report."
-            )
+    #     elif report_type == "mmi":
+    #         msg = (f"_A new earthquake report has been published by the USGS._\n\n"
+    #             f"**{self.ev_timestamp}**\n"
+    #             f"**{self.mmi_report_caption}**\n"
+    #             f"Magnitude: {self.ev_mag}\n"
+    #             f"Maximum intensity: {self.ev_maxnumeral} ({self.ev_maxdesc})\n"
+    #             f"Maximum intensity felt in the following cities:\n"
+    #             f"- {"\n- ".join(self.cities_max_mmi)}\n\n"
+    #             f"If you felt this earthquake, visit {self.ev_url+"/tellus"}"
+    #             f" to fill out a Did You Feel It report."
+    #         )
 
-        elif report_type == "update":
-            msg = (f"_This earthquake report has been updated._\n\n"
-                f"**{self.ev_timestamp}**\n"
-                f"**{self.mmi_report_caption}**\n"
-                f"Magnitude: {self.ev_mag}\n"
-                f"Maximum intensity: {self.ev_maxnumeral} ({self.ev_maxdesc})\n"
-                f"Maximum intensity felt in the following cities:\n"
-                f"- {"\n- ".join(self.cities_max_mmi)}\n"
-                f"If you felt this earthquake, visit {self.ev_url+"/tellus"}"
-                f" to fill out a Did You Feel It report.\n\n"
-                f"Last updated {format_usgs_time(self.ev_lastupdate)}"
-            )
+    #     elif report_type == "update":
+    #         msg = (f"_This earthquake report has been updated._\n\n"
+    #             f"**{self.ev_timestamp}**\n"
+    #             f"**{self.mmi_report_caption}**\n"
+    #             f"Magnitude: {self.ev_mag}\n"
+    #             f"Maximum intensity: {self.ev_maxnumeral} ({self.ev_maxdesc})\n"
+    #             f"Maximum intensity felt in the following cities:\n"
+    #             f"- {"\n- ".join(self.cities_max_mmi)}\n"
+    #             f"If you felt this earthquake, visit {self.ev_url+"/tellus"}"
+    #             f" to fill out a Did You Feel It report.\n\n"
+    #             f"Last updated {format_usgs_time(self.ev_lastupdate)}"
+    #         )
         
-        elif report_type == "nomap":
-            msg = (f"_A new earthquake report has been published by the USGS._\n\n"
-                f"On {self.ev_timestamp}\n"
-                f"A magnitude {self.ev_mag} earthquake occurred in the region.\n"
-                f"No intensity-per-city information is available to plot for this earthquake.\n"
-                f"For more details visit {self.ev_url}"
-            )
+    #     elif report_type == "nomap":
+    #         msg = (f"_A new earthquake report has been published by the USGS._\n\n"
+    #             f"On {self.ev_timestamp}\n"
+    #             f"A magnitude {self.ev_mag} earthquake occurred in the region.\n"
+    #             f"No intensity-per-city information is available to plot for this earthquake.\n"
+    #             f"For more details visit {self.ev_url}"
+    #         )
 
-        if test:
-            return "**THIS IS A TEST**\n" + msg
-        else:
-            return msg
-
-
-    def email_mmi_report(self):
-        # approve = input("This will send an email. Type 'y' to approve:")
-        approve = 'y'
-        if approve == 'y':
-            # TODO: make a new email account to send these
-            sender = "fran.yair.co@gmail.com"
-            recip = ["fran.yair.co@gmail.com"]
-            app_pass = "elculxcuzmougral"
-
-            msg = EmailMessage()
-            msg["Subject"] = f"[AUTOMATED] {self.mmi_report_caption} - Intensity Report (USGS)"
-            msg["From"] = sender
-            msg["To"] = recip
-            image_cid = "mmi_plot"
-            msg.add_alternative(f"""\
-            <!DOCTYPE html>
-            <html>
-                <body>
-                    <p>A new USGS earthquake report has been issued.</p>
-                    <h2>{self.ev_timestamp}</h2>
-                    <h2>{self.mmi_report_caption}</h2>
-                    <p>Magnitude: {self.ev_mag}</p>
-                    <p>Maximum intensity: {self.ev_maxnumeral} ({self.ev_maxdesc}) 
-                    observed in <br>{"<br>".join(self.cities_max_mmi)}</p>
-                    <img src="cid:{image_cid}" alt="MMI map" style="width:100%;"/>
-                </body>
-            </html>
-            """, subtype="html")
-
-            image_path = 'data/latest_mmis.png'
-            with open(image_path, "rb") as f:
-                msg.get_payload()[0].add_related(
-                    f.read(), 
-                    maintype="image", 
-                    subtype="png", 
-                    cid=image_cid
-                )
-
-            try:
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-                    server.login(sender, app_pass)
-                    server.send_message(msg)
-                print("Email with PNG attachment sent successfully!")
-            except Exception as e:
-                print(f"An error occurred: {e}")
-
-        else: print("Not sending email")
+    #     if test:
+    #         return "**THIS IS A TEST**\n" + msg
+    #     else:
+    #         return msg
 
 def format_usgs_time(t):
     if t < 0:

@@ -374,6 +374,10 @@ async def check_quakes():
             if rm.is_significant:
                 manage_significant_quakes(rm)
 
+            # update txt file with update time
+            with open("latest_report.txt","w") as f:
+                f.write(f"{rm.ev_id}\n{rm.ev_lastupdate}")
+
             # edit all existing reports
             for sent_report in select_msgs(rm.ev_id):
                 update_embeds, update_imgs = make_embeds_from_reportmaker(
@@ -423,6 +427,10 @@ async def check_quakes():
 
         if rm.is_significant:
             manage_significant_quakes(rm)
+
+        # update txt file with new id
+        with open("latest_report.txt","w") as f:
+            f.write(f"{rm.ev_id}\n{rm.ev_lastupdate}")
 
         msg_eew = rm.format_report_msg("eew",index)
         msg_mmi = rm.format_report_msg("mmi",index)

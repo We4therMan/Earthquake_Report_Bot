@@ -50,14 +50,21 @@ def get_quakes_to_update():
         for line in lines:
             try:
                 quake_id, quake_timestamp, update_timestamp = line.split()
-            except:
+            except ValueError:
                 print("No quakes in file.")
                 return [], []
             time_since_quake = timedelta(milliseconds=(timestamp_now-int(quake_timestamp)))
+
+            time_until_deadline = deadline - time_since_quake
+            tud_days, tud_hours = time_until_deadline.days, (time_until_deadline.seconds // 3600)
+            # print(f"{timestamp_now = }, {time_since_quake = }, {deadline = } {time_until_deadline = }")
+
             if time_since_quake < deadline:
                 # if timestamp is less than 5 days ago, write. Otherwise ignore and stop updating
+                print(f"Event {quake_id} will stop being updated in {tud_days} days, {tud_hours} hours.")
                 valid_quakes.append(quake_id)
                 quake_last_updates.append(int(update_timestamp))
                 f.write(line)
-    print(f"The following IDs will be updated: {valid_quakes}")
+            else:
+                print(f"Event {quake_id} has passed the deadline and will no longer be updated.")
     return valid_quakes, quake_last_updates
