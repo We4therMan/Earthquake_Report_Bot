@@ -435,7 +435,7 @@ async def check_quakes():
     print("Broadcasting messages.")
     for guild in bot.guilds:
         embeds, imgs = make_embeds_from_reportmaker(rm)
-        print(embeds,imgs)
+        print(embeds[0].to_dict(),imgs)
 
         channel_id = get_channel(guild.id)
         if not channel_id:
