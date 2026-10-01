@@ -375,7 +375,7 @@ async def check_quakes():
                 manage_significant_quakes(rm)
 
             # update txt file with update time
-            with open("latest_report.txt","w") as f:
+            with open("data/latest_report.txt","w") as f:
                 f.write(f"{rm.ev_id}\n{rm.ev_lastupdate}")
 
             # edit all existing reports
@@ -387,7 +387,7 @@ async def check_quakes():
                 )
 
                 guild_id, channel_id, msg_id = sent_report
-                print(f"Fetching msg {msg_id}")
+                print(f"Fetching {msg_id} for update to event {rm.ev_id}")
                 # get channel id from bot chache
                 channel = bot.get_channel(channel_id)
                 # find through api if not available
@@ -411,7 +411,7 @@ async def check_quakes():
                 # edit message
                 try:
                     await msg_to_edit.edit(embeds=update_embeds,attachments=update_imgs)
-                    print(f'msg sent')
+                    print(f'Message in {guild.name} updated')
                 except discord.Forbidden:
                     print(f"No permissions to edit message in {channel_id}")
                     continue
@@ -421,7 +421,7 @@ async def check_quakes():
     else:
         # (note: can also be the previous event if the latest event has a magnitude downgrade)
         # make both maps and messages
-        print("New event posted.")
+        print("This is a new event.")
         rm.make_eew_map()
         rm.make_mmi_map()
 
@@ -429,12 +429,13 @@ async def check_quakes():
             manage_significant_quakes(rm)
 
         # update txt file with new id
-        with open("latest_report.txt","w") as f:
+        with open("data/latest_report.txt","w") as f:
             f.write(f"{rm.ev_id}\n{rm.ev_lastupdate}")
 
-    print("Broadcasting messages")
+    print("Broadcasting messages.")
     for guild in bot.guilds:
         embeds, imgs = make_embeds_from_reportmaker(rm)
+        print(embeds,imgs)
 
         channel_id = get_channel(guild.id)
         if not channel_id:
@@ -449,7 +450,9 @@ async def check_quakes():
                 continue
             except discord.Forbidden:
                 continue
+
         sent_msg = await channel.send(embeds=embeds,files=imgs)
+        print(f"Message sent to {guild.name}")
         store_msg(rm.ev_id, sent_msg.guild.id, sent_msg.channel.id, sent_msg.id)
 
 def read_latest():
