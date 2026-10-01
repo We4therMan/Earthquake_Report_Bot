@@ -432,9 +432,6 @@ async def check_quakes():
         with open("latest_report.txt","w") as f:
             f.write(f"{rm.ev_id}\n{rm.ev_lastupdate}")
 
-        msg_eew = rm.format_report_msg("eew",index)
-        msg_mmi = rm.format_report_msg("mmi",index)
-
     print("Broadcasting messages")
     for guild in bot.guilds:
         embeds, imgs = make_embeds_from_reportmaker(rm)
