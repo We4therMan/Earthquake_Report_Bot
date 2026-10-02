@@ -107,7 +107,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
 
     rm_temp = ReportMaker() # new insance to avoid editing the auto-reports
 
-    rm_temp.load_ev_detail(index,is_temp=True)
+    rm_temp.load_ev_detail(index)
     # rm_temp.get_eew_data()
 
     # check if event happened before launch of ShakeAlert
@@ -120,7 +120,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
 
     await status.edit(content="Loading ShakeAlert data...")
 
-    rm_temp.make_eew_map(is_temp=True)
+    rm_temp.make_eew_map(fname="eew_temp.png")
     if rm_temp.has_eew:
         eew_msg = (
             f"This earthquake triggered ShakeAlert.\n"
@@ -155,7 +155,7 @@ async def viewevent(interaction: discord.Interaction, index: int):
     embeds.append(temp_eew_embed)
 
     await status.edit(content="Loading intensity data...")
-    rm_temp.make_mmi_map(is_temp=True)
+    rm_temp.make_mmi_map(fname="mmi_temp.png")
 
     if rm_temp.mmi_plottable:
         temp_mmi_embed = make_viewevent_mmi_embed(
@@ -216,7 +216,7 @@ async def viewevent(interaction: discord.Interaction, id: str):
     except:
         await interaction.followup.send(f"Could not load event {id}. Please double check the ID.")
 
-    rm_temp.load_ev_detail(is_temp=True)
+    rm_temp.load_ev_detail()
     # rm_temp.get_eew_data()
 
     # check if event happened before launch of ShakeAlert
@@ -229,7 +229,7 @@ async def viewevent(interaction: discord.Interaction, id: str):
 
     await status.edit(content="Loading ShakeAlert data...")
 
-    rm_temp.make_eew_map(is_temp=True)
+    rm_temp.make_eew_map(fname="eew_temp.png")
     if rm_temp.has_eew:
         eew_msg = (
             f"This earthquake triggered ShakeAlert.\n"
@@ -265,7 +265,7 @@ async def viewevent(interaction: discord.Interaction, id: str):
 
     await status.edit(content="Loading intensity data...")
 
-    rm_temp.make_mmi_map(is_temp=True)
+    rm_temp.make_mmi_map(fname="mmi_temp.png")
     if rm_temp.mmi_plottable:
         temp_mmi_embed = make_viewevent_mmi_embed(
             event_title=rm_temp.data['properties']['title'],
@@ -300,7 +300,7 @@ async def viewevent(interaction: discord.Interaction, id: str):
 
     await interaction.followup.send(embeds=embeds,files=imgs)
 
-    await status.edit(content=f"Finished loading event {rm_temp.ev_detail['properties']['title']}!")
+    await status.edit(content=f"Finished loading event {rm_temp.ev_detail['properties']['title']}")
 
 @bot.command()
 @commands.is_owner()
@@ -491,14 +491,16 @@ async def update_significant_quakes():
             print("Significant event has not been updated.")
             continue
 
-        rm_significant.make_eew_map()
-        rm_significant.make_mmi_map()
+        rm_significant.make_eew_map(fname="significant_eew.png")
+        rm_significant.make_mmi_map(fname="significant_mmi.png")
 
         for sent_report in select_msgs(rm_significant.ev_id):
             update_embeds, update_imgs = make_embeds_from_reportmaker(
                 rm_significant,
                 is_update=True,
-                update_timestamp=rm_significant.ev_lastupdate
+                update_timestamp=rm_significant.ev_lastupdate,
+                eew_map_fname="significant_eew.png",
+                mmi_map_fname="significant_mmi.png"
             )
 
             guild_id, channel_id, msg_id = sent_report
@@ -538,6 +540,8 @@ def make_embeds_from_reportmaker(
         rm: ReportMaker, 
         is_update = False, 
         update_timestamp: int = None,
+        eew_map_fname: str = "latest_eew.png",
+        mmi_map_fname: str = "latest_mmis.png"
         ):
     """ Creates Discord embeds from the available info in the given ReportMaker object.
 
@@ -565,7 +569,7 @@ def make_embeds_from_reportmaker(
             rm.eew_mag,
             rm.formatted_warned_areas
         )
-        eew_map = discord.File("data/latest_eew.png",filename="latest_eew.png")
+        eew_map = discord.File(f"data/{eew_map_fname}",filename=eew_map_fname)
         embeds.append(eew_embed)
         imgs.append(eew_map)
 
@@ -581,7 +585,7 @@ def make_embeds_from_reportmaker(
             update=is_update,
             update_time=update_timestamp
         )
-        mmi_map = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
+        mmi_map = discord.File(f"data/{mmi_map_fname}",filename=mmi_map_fname)
         embeds.append(mmi_embed)
         imgs.append(mmi_map)
 
@@ -595,7 +599,7 @@ def make_embeds_from_reportmaker(
             update=is_update,
             update_time=update_timestamp
         )
-        mmi_map = discord.File("data/latest_mmis.png",filename="latest_mmis.png")
+        mmi_map = discord.File(f"data/{mmi_map_fname}",filename=mmi_map_fname)
         embeds.append(nomap_embed)
         imgs.append(mmi_map)
 

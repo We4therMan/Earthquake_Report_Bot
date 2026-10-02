@@ -132,7 +132,7 @@ class ReportMaker:
             # otherwise make eventlist and proceed as normal
             self.evlist = [(str(i),feat['properties']['title']) for i, feat in enumerate(self.data['features'])]
 
-    def load_ev_detail(self,index=0,is_temp=False):
+    def load_ev_detail(self,index=0):
         """Parses USGS API response and writes txt file with event id
 
         index: select different item from list (attr evlist). Default 0 (latest event) [int]
@@ -410,7 +410,7 @@ class ReportMaker:
             else: 
                 self.formatted_warned_areas = warned_names
 
-    def make_eew_map(self,show=False,is_temp=False):
+    def make_eew_map(self,show=False,fname="latest_eew.png"):
         """
         show: show plot in matplotlib (for testing) [bool, default: False]
         is_temp: adds "temp" to filename for maps called by command and not by API watcher [bool, default: False]
@@ -535,8 +535,8 @@ class ReportMaker:
                         arrowprops=dict(arrowstyle='-',color='k',lw=0.5))
 
             # axi.set_title(f"Example: {event['properties']['title']}, threshold {MMI}")
-            fname = "data/eew_temp.png" if is_temp else "data/latest_eew.png"
-            plt.savefig(fname,bbox_inches='tight')
+            fn = f"data/{fname}"
+            plt.savefig(fn,bbox_inches='tight')
             if show: plt.show()
             else: plt.close()
         else:
@@ -633,7 +633,7 @@ class ReportMaker:
             caption = f'{desc} occurred off {epi_county} County, {epi_state}'
         self.mmi_report_caption = caption
 
-    def make_mmi_map(self,show=False,is_temp=False):
+    def make_mmi_map(self,show=False,fname="latest_mmis.png"):
         """
         show: show plot in matplotlib (for testing) [bool, default: False]
         is_temp: adds "temp" to filename for maps called by command and not by API watcher [bool, default: False]
@@ -793,8 +793,8 @@ class ReportMaker:
                         force_static=15,
                         arrowprops=dict(arrowstyle='-',color='k',lw=0.5))
 
-            fname = "data/mmi_temp.png" if is_temp else "data/latest_mmis.png"
-            plt.savefig(fname,bbox_inches='tight')
+            fn = f"data/{fname}"
+            plt.savefig(fn,bbox_inches='tight')
             if show: plt.show()
             else: plt.close()
 
@@ -841,8 +841,8 @@ class ReportMaker:
             for line in lines: 
                 line.set_visible(False)
 
-            fname = "data/mmi_temp.png" if is_temp else "data/latest_mmis.png"
-            plt.savefig(fname,bbox_inches='tight')
+            fn = f"data/{fname}"
+            plt.savefig(fn,bbox_inches='tight')
             if show: plt.show()
             else: plt.close()
 
