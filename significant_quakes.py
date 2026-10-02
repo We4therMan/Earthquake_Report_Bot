@@ -13,12 +13,32 @@ def manage_significant_quakes(rm: ReportMaker):
             id = (line.split(" ")[0])
             if ev_id == id:
                 id_in_file = True
-                print("This ID found in file.")
+                print("ID already in file.")
                 break
     if not id_in_file:
         with open("data/significant_quakes.txt",'a') as f_a:
             print("Appending this event to significant quake list.")
             f_a.write(f"{rm.ev_id} {rm.ev_epoch} {rm.ev_lastupdate}\n")
+
+def refresh_update_time(rm: ReportMaker):
+    """ Writes the new latest_update time to the text file for the given ID.
+    """
+    new_line = f"{rm.ev_id} {rm.ev_epoch} {rm.ev_lastupdate}\n"
+    ev_id = rm.ev_id
+    updated_lines = []
+    with open("data/significant_quakes.txt",'r') as f:
+        for line in f:
+            id = (line.split(" ")[0])
+            if ev_id == id:
+                updated_lines.append(new_line)
+            else:
+                updated_lines.append(line)
+
+    with open("data/significant_quakes.txt",'w') as f:
+        f.writelines(updated_lines)
+    print("Stored update time for event refreshed.")
+        
+
 
 def get_quakes_to_update():
     """ Updates list of significant quake reports to update.

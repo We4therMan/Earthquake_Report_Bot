@@ -28,6 +28,7 @@ from embeds import (
     )
 from significant_quakes import (
     manage_significant_quakes,
+    refresh_update_time,
     get_quakes_to_update
     )
 
@@ -411,7 +412,7 @@ async def check_quakes():
                 # edit message
                 try:
                     await msg_to_edit.edit(embeds=update_embeds,attachments=update_imgs)
-                    print(f'Message in {guild.name} updated')
+                    print(f'Message in {bot.get_guild(guild_id).name} updated')
                 except discord.Forbidden:
                     print(f"No permissions to edit message in {channel_id}")
                     continue
@@ -435,7 +436,6 @@ async def check_quakes():
     print("Broadcasting messages.")
     for guild in bot.guilds:
         embeds, imgs = make_embeds_from_reportmaker(rm)
-        print(embeds[0].to_dict(),imgs)
 
         channel_id = get_channel(guild.id)
         if not channel_id:
@@ -474,16 +474,23 @@ async def update_significant_quakes():
         return
 
     for quake_id, lastup_time in zip(quakes_to_check, last_update_times):
+        latest_id, _ = read_latest()
+        if latest_id == quake_id:
+            print("This event is also the latest, and is being updated every minute. Skipping significant event update.")
+            continue
+
         query = {
             "format": "geojson",
             "eventid": quake_id
         }
         rm_significant = ReportMaker(query=query)
         rm_significant.load_ev_detail()
+
         if lastup_time == rm_significant.ev_lastupdate:
-            # if no update, do nothing
+            # if no update, do nothing and check next event
             print("Significant event has not been updated.")
             continue
+
         rm_significant.make_eew_map()
         rm_significant.make_mmi_map()
 
@@ -519,10 +526,13 @@ async def update_significant_quakes():
             # edit message
             try:
                 await msg_to_edit.edit(embeds=update_embeds,attachments=update_imgs)
-                print(f'msg sent')
+                print(f'Message in {bot.get_guild(guild_id).name} updated')
             except discord.Forbidden:
                 print(f"No permissions to edit message in {channel_id}")
                 continue
+
+        # after messages are sent, refresh update time in file
+        refresh_update_time(rm_significant)
 
 def make_embeds_from_reportmaker(
         rm: ReportMaker, 
