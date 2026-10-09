@@ -507,12 +507,12 @@ class ReportMaker:
             for city in self.canv_cities.iterrows():
                 clon, clat = city[1]["lon"], city[1]["lat"]
                 if (clon < x1 or clon > x2) \
-                    or (clat < y1 or clat > y2) \
-                    or (city[1]["county_name"] not in self.ca_nv[self.ca_nv['warned']==True]["NAME"].tolist()):
-                    # if out of bounds or not in a warned county, don't use
+                    or (clat < y1 or clat > y2): 
+                    # or (city[1]["county_name"] not in self.ca_nv[self.ca_nv['warned']==True]["NAME"].tolist()):
+                    # # if out of bounds or not in a warned county, don't use
                     continue
 
-                cname = city[1]["city"]
+                cname = city[1]["City"]
                 cmarker, = axi.plot(clon,clat,".",c="k",markersize=8,zorder=14)
                 clabel = axi.text(clon,clat,cname,c='k',fontsize=15,ha='center',zorder=14)
 
@@ -755,7 +755,7 @@ class ReportMaker:
                     # if out of map, don't use
                     continue
         
-                cname = city[1]["city"]
+                cname = city[1]["City"]
                 cmarker, = axi.plot(clon,clat,".",c="k",markersize=8,zorder=14)
                 clabel = axi.text(clon,clat,cname,c='k',fontsize=15,ha='center',zorder=14)
         
