@@ -17,7 +17,8 @@ from guilds import (
 from reports import (
     make_table, 
     store_msg, 
-    select_msgs
+    select_msgs,
+    report_posted
     )
 from embeds import (
     make_eew_embed, 
@@ -85,6 +86,10 @@ async def setchannel(
 
 @bot.tree.command(name="eventlist",description="Show full saved event list.")
 async def eventlist(interaction: discord.Interaction):
+    try:
+        rm
+    except NameError:
+        print("The report maker is not initialized yet. Please wait a couple of seconds.")
     text = "\n".join(f"{i}: {ev}" for i, ev in rm.evlist)
     file = discord.File(
         StringIO(text),
@@ -99,6 +104,11 @@ async def eventlist(interaction: discord.Interaction):
 @bot.tree.command(name="viewevent",description="Show the report for an event in the eventlist.")
 @app_commands.describe(index="Index of the eventlist earthquake you want to view (latest is 0, default)")
 async def viewevent(interaction: discord.Interaction, index: int):
+    try:
+        rm
+    except NameError:
+        print("The report maker is not initialized yet. Please wait a couple of seconds.")
+
     try:
         await interaction.response.defer()
         status = await interaction.followup.send(f"Loading event {':\n'.join(rm.evlist[index])}...")
@@ -197,12 +207,11 @@ async def viewevent(interaction: discord.Interaction, index: int):
 
 @bot.tree.command(name="vieweventbyid",description="Show the report for an event from its USGS 'eventid'.")
 @app_commands.describe(id="USGS event ID of the event you want to see")
-async def viewevent(interaction: discord.Interaction, id: str):
-    # try:
-    #     await interaction.response.defer()
-    #     status = await interaction.followup.send(f"Loading event {':\n'.join(rm.evlist[index])}...")
-    # except IndexError:
-    #     await interaction.followup.send(f"Index out of bounds. Must be 0 to {len(rm.evlist)-1}")
+async def viewevent_by_id(interaction: discord.Interaction, id: str):
+    try:
+        rm
+    except NameError:
+        print("The report maker is not initialized yet. Please wait a couple of seconds.")
 
     query = {
         "eventid": id,
@@ -215,6 +224,7 @@ async def viewevent(interaction: discord.Interaction, id: str):
         status = await interaction.followup.send(f"Loading event {id}...")
     except:
         await interaction.followup.send(f"Could not load event {id}. Please double check the ID.")
+        return
 
     rm_temp.load_ev_detail()
     # rm_temp.get_eew_data()
@@ -431,7 +441,12 @@ async def check_quakes():
 
         # update txt file with new id
         with open("data/latest_report.txt","w") as f:
+            print(f"Refreshing latest_report.txt: {rm.ev_id} {rm.ev_lastupdate}")
             f.write(f"{rm.ev_id}\n{rm.ev_lastupdate}")
+
+        if report_posted(rm.ev_id):
+            print("Report has already been posted. Skipping new message send. Original event post will be updated instead.")
+            return
 
     print("Broadcasting messages.")
     for guild in bot.guilds:
@@ -463,7 +478,8 @@ def read_latest():
             curr_ev_lastupdate = lines[1].strip()
             return curr_ev_id, curr_ev_lastupdate
     except FileNotFoundError:
-        return None
+        # return meaningless strings so check_quakes can update and overwrite
+        return "00000000", "00000000"
 
 @tasks.loop(minutes=15)
 async def update_significant_quakes():

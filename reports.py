@@ -51,3 +51,16 @@ def select_msgs(ev_id):
     reports_for_event = cursor.fetchall()
     reports = [(guild_id, channel_id, message_id) for guild_id, channel_id, message_id in reports_for_event]
     return reports
+
+def report_posted(ev_id):
+    """Checks if the event_id already has a set of messages posted.
+    Helps avoid duplicated posts for the same earthquake.
+    """
+    conn = sqlite3.connect(f"data/messages.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    query = f"SELECT EXISTS(SELECT 1 FROM reports WHERE event_id = ? LIMIT 1)"
+    cursor.execute(query,(ev_id,))
+
+    return cursor.fetchone()[0] == 1
