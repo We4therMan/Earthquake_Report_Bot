@@ -505,7 +505,7 @@ class ReportMaker:
             x_to_avoid = []
             y_to_avoid = []
             for city in self.canv_cities.iterrows():
-                clon, clat = city[1]["lng"], city[1]["lat"]
+                clon, clat = city[1]["lon"], city[1]["lat"]
                 if (clon < x1 or clon > x2) \
                     or (clat < y1 or clat > y2) \
                     or (city[1]["county_name"] not in self.ca_nv[self.ca_nv['warned']==True]["NAME"].tolist()):
@@ -748,7 +748,7 @@ class ReportMaker:
             x_to_avoid = []
             y_to_avoid = []
             for city in self.canv_cities.iterrows():
-                clon, clat = city[1]["lng"], city[1]["lat"]
+                clon, clat = city[1]["lon"], city[1]["lat"]
                 # shrink city lookup area to a box smaller to keep too many cities off to the sides from being used
                 sh_x, sh_y = box_hl/2.75, box_hl/3.75
                 if (clon < x1+sh_x or clon > x2-sh_x) or (clat < y1+sh_y or clat > y2-sh_y):
