@@ -543,76 +543,76 @@ class ReportMaker:
             print("No EEW was issued for this event.")
 
     def get_mmi_data(self):
-        try:
-            # fetch intensity info from losspager. Usually only available for significant earthquakes
-            city_mmi_url = self.ev_detail['properties']['products']['losspager'][0]['contents']['json/cities.json']['url']
-            r4 = requests.get(city_mmi_url)
-            city_mmis = r4.json()
+        # try:
+        #     # fetch intensity info from losspager. Usually only available for significant earthquakes
+        #     city_mmi_url = self.ev_detail['properties']['products']['losspager'][0]['contents']['json/cities.json']['url']
+        #     r4 = requests.get(city_mmi_url)
+        #     city_mmis = r4.json()
 
-            # source_data = self.ev_detail['properties']['products']['losspager'][0]['properties']
-            # self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
+        #     # source_data = self.ev_detail['properties']['products']['losspager'][0]['properties']
+        #     # self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
+        #     # self.ev_mag = float(source_data['magnitude'])
+        #     # alternative map centering on epicenter, bad for offshore earthquakes
+        #     # x1, x2, y1, y2 = (epix - box_hl, epix + box_hl, epiy - box_hl/1.5, epiy + box_hl/1.5)
+
+        #     names = []
+        #     coord_pairs = []
+        #     mmis = []
+
+        #     for city in city_mmis['all_cities']:
+        #         names.append(city['name'])
+        #         coord_pairs.append((city['lon'], city['lat']))
+        #         mmis.append(city['mmi'])
+        #     self.city_names = names
+        #     self.mmi_coord_pairs = coord_pairs
+        #     self.mmis = mmis
+
+        #     self.dyfi_used = False
+        #     # losspager earthquakes are implicitly significant
+        #     self.is_significant = True
+        #     print("This event has been labeled significant due to having a losspager product.")
+
+        #     if names: self.mmi_plottable = True
+        #     # end of losspager data. Below here use dyfi if not available.
+        #     # needed vars: names, coord pairs, mmis, mag, (epix, epiy)
+
+        # except KeyError:
+        #     print("No losspager. Using dyfi txt")
+        try:
+            dyfi_data = self.ev_detail['properties']['products']['dyfi'][0]
+            num_resp = int(dyfi_data['properties']['num-responses'])
+            if num_resp >= 250:
+                self.is_significant = True
+                print("This event has been labeled significant due to having a high number of DYFI reports.")
+            # source_data = dyfi_data['properties']
             # self.ev_mag = float(source_data['magnitude'])
-            # alternative map centering on epicenter, bad for offshore earthquakes
-            # x1, x2, y1, y2 = (epix - box_hl, epix + box_hl, epiy - box_hl/1.5, epiy + box_hl/1.5)
+            # self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
+
+            r4 = requests.get(dyfi_data['contents']['cdi_zip.txt']['url'])
+            txt_zip_mmis = r4.text
+            zip_mmis = pd.read_csv(io.StringIO(txt_zip_mmis))
 
             names = []
             coord_pairs = []
             mmis = []
 
-            for city in city_mmis['all_cities']:
-                names.append(city['name'])
-                coord_pairs.append((city['lon'], city['lat']))
-                mmis.append(city['mmi'])
+            names = zip_mmis['City'].tolist()
+            mmis = zip_mmis['CDI'].tolist()
+            mmis = [int(round(x)) for x in mmis]
+            for i, row in zip_mmis.iterrows():
+                coord_pairs.append((row['Longitude'], row['Latitude']))
+
             self.city_names = names
             self.mmi_coord_pairs = coord_pairs
             self.mmis = mmis
 
-            self.dyfi_used = False
-            # losspager earthquakes are implicitly significant
-            self.is_significant = True
-            print("This event has been labeled significant due to having a losspager product.")
+            self.dyfi_used = True
 
             if names: self.mmi_plottable = True
-            # end of losspager data. Below here use dyfi if not available.
-            # needed vars: names, coord pairs, mmis, mag, (epix, epiy)
-
-        except KeyError:
-            print("No losspager. Using dyfi txt")
-            try:
-                dyfi_data = self.ev_detail['properties']['products']['dyfi'][0]
-                num_resp = int(dyfi_data['properties']['num-responses'])
-                if num_resp >= 250:
-                    self.is_significant = True
-                    print("This event has been labeled significant due to having a high number of DYFI reports.")
-                # source_data = dyfi_data['properties']
-                # self.ev_mag = float(source_data['magnitude'])
-                # self.ev_epix, self.ev_epiy = float(source_data['longitude']), float(source_data['latitude'])
-
-                r4 = requests.get(dyfi_data['contents']['cdi_zip.txt']['url'])
-                txt_zip_mmis = r4.text
-                zip_mmis = pd.read_csv(io.StringIO(txt_zip_mmis))
-
-                names = []
-                coord_pairs = []
-                mmis = []
-
-                names = zip_mmis['City'].tolist()
-                mmis = zip_mmis['CDI'].tolist()
-                mmis = [int(round(x)) for x in mmis]
-                for i, row in zip_mmis.iterrows():
-                    coord_pairs.append((row['Longitude'], row['Latitude']))
-
-                self.city_names = names
-                self.mmi_coord_pairs = coord_pairs
-                self.mmis = mmis
-
-                self.dyfi_used = True
-
-                if names: self.mmi_plottable = True
-            except:
-                # self.ev_mag = self.ev_detail['properties']['mag']
-                print("losspager and dyfi not available. Plot cannot be be made")
-                self.mmi_plottable = False
+        except:
+            # self.ev_mag = self.ev_detail['properties']['mag']
+            print("dyfi not available. Plot cannot be be made")
+            self.mmi_plottable = False
 
         desc = self.mag_style(self.ev_mag)
         epi_mask = self.ca_nv.contains(Point(self.ev_epix, self.ev_epiy))
