@@ -608,7 +608,7 @@ class ReportMaker:
 
             self.dyfi_used = True
 
-            if names: self.mmi_plottable = True
+            self.mmi_plottable = bool(names)
         except:
             # self.ev_mag = self.ev_detail['properties']['mag']
             print("dyfi not available. Plot cannot be be made")
