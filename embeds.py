@@ -3,8 +3,8 @@ from USGSreportmaker import ReportMaker, format_usgs_time
 
 def make_eew_embed(eew_caption,mag,area_list):
     embed = discord.Embed(
-        title="Earthquake Early Warning",
-        description=f'ShakeAlert has been triggered.\n{eew_caption}',
+        title="ShakeAlert Report",
+        description=f'An earthquake has triggered ShakeAlert.\n{eew_caption}',
         color=discord.Colour.red(),
     )
     
@@ -16,6 +16,22 @@ def make_eew_embed(eew_caption,mag,area_list):
     fname = "latest_eew.png"
     embed.set_image(url=f'attachment://{fname}')
 
+    return embed
+
+def make_eew_prelim_embed(
+        time,
+        mmi_caption,
+        mag
+    ):
+    """For events with ID prefix 'ew', which are ShakeAlert preliminary.
+    These are replaced with a region-dependent ID so the embed shouldn't be duplicated."""
+    embed = discord.Embed(
+        title="ShakeAlert has been activated",
+        description=f"On {time},\n{mmi_caption}\n\nMore information on this earthquake will be available shortly.",
+    )
+
+    embed.add_field(name="Estimated magnitude",value=mag)
+    
     return embed
 
 def make_mmi_embed(
@@ -87,6 +103,8 @@ def make_viewevent_eew_embed(event_title,has_eew=False,viewev_eew_caption=None,m
         embed.set_image(url=f'attachment://{fname}')
 
     return embed
+
+
 
 def make_viewevent_mmi_embed(
         event_title,

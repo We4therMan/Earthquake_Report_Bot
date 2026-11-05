@@ -21,7 +21,8 @@ from reports import (
     report_posted
     )
 from embeds import (
-    make_eew_embed, 
+    make_eew_embed,
+    make_eew_prelim_embed,
     make_mmi_embed, 
     make_nomap_embed, 
     make_viewevent_eew_embed, 
@@ -465,10 +466,13 @@ async def check_quakes():
                 continue
             except discord.Forbidden:
                 continue
-
-        sent_msg = await channel.send(embeds=embeds,files=imgs)
-        print(f"Message sent to {guild.name}")
-        store_msg(rm.ev_id, sent_msg.guild.id, sent_msg.channel.id, sent_msg.id)
+        if rm.ev_id.startswith("ew"):
+            # ShakeAlert prelims self delete after 10 minutes, presuming the actual report has been posted by then
+            sent_msg = await channel.send(embeds=embeds, delete_after=600.0)
+        else:
+            sent_msg = await channel.send(embeds=embeds,files=imgs)
+            print(f"Message sent to {guild.name}")
+            store_msg(rm.ev_id, sent_msg.guild.id, sent_msg.channel.id, sent_msg.id)
 
 def read_latest():
     try:
@@ -579,6 +583,16 @@ def make_embeds_from_reportmaker(
     
     embeds = []
     imgs = []
+    # check if event is a preliminary ShakeAlert event by its ID prefix
+    if rm.ev_id.startswith("ew"):
+        prelim_embed = make_eew_prelim_embed(
+            rm.ev_timestamp,
+            rm.mmi_report_caption,
+            rm.ev_mag
+        )
+        # no image is generated, and no more embeds are needed
+        return [prelim_embed], [] 
+
     if rm.has_eew:
         eew_embed = make_eew_embed(
             rm.eew_caption,

@@ -83,7 +83,7 @@ class ReportMaker:
         # initialize all attributes (avoid errors for not existing)
         self.queried_by_id = False
         self.evlist = None # indexed list of events from query
-        self.ev_id = None # USGS event ID
+        self.ev_id: str = None # USGS event ID
         self.ev_lastupdate = None # time of last USGS update to event (if any)
         self.ev_url = None # link to executive USGS page for event
         self.ev_epoch = None # raw epoch time of event
@@ -622,7 +622,11 @@ class ReportMaker:
             epi_county = self.ca_nv[epi_mask]['NAME'].to_list()[0]
             epi_statefp = self.ca_nv[epi_mask]['STATEFP'].to_list()[0]
             epi_state = name_from_fp(epi_statefp)
-            caption = f'{desc} occurred in {epi_county} County, {epi_state}'
+            if self.ev_id.startswith("ew"):
+                # ShakeAlert prelims should use detection language as they are unrevised
+                caption = f'{desc} was detected in {epi_county} County, {epi_state}'
+            else:
+                caption = f'{desc} occurred in {epi_county} County, {epi_state}'
         else:
             #if epicenter is off all polygons (assumes offshore)
             # better method needed for events onshore off region (e.g. in Oregon, Utah, Mexico, etc.)
@@ -630,7 +634,11 @@ class ReportMaker:
             epi_county = self.ca_nv.loc[county_closest]["NAME"]
             epi_statefp = self.ca_nv.loc[county_closest]['STATEFP']
             epi_state = name_from_fp(epi_statefp)
-            caption = f'{desc} occurred off {epi_county} County, {epi_state}'
+            if self.ev_id.startswith("ew"):
+                # ShakeAlert prelims should use detection language as they are unrevised
+                caption = f'{desc} was detected off {epi_county} County, {epi_state}'
+            else:
+                caption = f'{desc} occurred off {epi_county} County, {epi_state}'
         self.mmi_report_caption = caption
 
     def make_mmi_map(self,show=False,fname="latest_mmis.png"):
